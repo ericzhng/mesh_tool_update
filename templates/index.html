@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>2D Mesh Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        #mesh-canvas { border: 1px solid #888; background: #f9f9f9; }
+        #summary { margin: 1em; }
+        #controls { margin: 1em; }
+    </style>
+</head>
+<body>
+    <h1>2D Mesh Editor</h1>
+    <div id="summary"></div>
+    <div id="controls">
+        <button onclick="addNode()">Add Node</button>
+        <button onclick="exportMatrix()">Export Connectivity Matrix</button>
+    </div>
+    <canvas id="mesh-canvas" width="800" height="600"></canvas>
+    <script>
+        const socket = io();
+        let mesh = {nodes: [], connections: []};
+        let selectedNode = null;
+        let drawingConnection = false;
+        let connectionStart = null;
+
+        function drawMesh() {
+            const canvas = document.getElementById('mesh-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw connections
+            ctx.strokeStyle = '#0074D9';
+            ctx.lineWidth = 2;
+            mesh.connections.forEach(c => {
+                const n1 = mesh.nodes.find(n => n.id === c.source);
+                const n2 = mesh.nodes.find(n => n.id === c.target);
+                if (n1 && n2) {
+                    ctx.beginPath();
+                    ctx.moveTo(n1.x, n1.y);
+                    ctx.lineTo(n2.x, n2.y);
+                    ctx.stroke();
+                }
+            });
+            // Draw nodes
+            mesh.nodes.forEach(n => {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = (selectedNode && selectedNode.id === n.id) ? '#FF4136' : '#2ECC40';
+                ctx.fill();
+                ctx.strokeStyle = '#111';
+                ctx.stroke();
+                ctx.fillStyle = '#111';
+                ctx.fillText(n.id, n.x - 5, n.y + 4);
+            });
+        }
+
+        function updateSummary(summary) {
+            document.getElementById('summary').innerText = `Nodes: ${summary.num_nodes}, Connections: ${summary.num_connections}`;
+        }
+
+        socket.on('mesh_data', data => {
+            mesh = data;
+            drawMesh();
+        });
+        socket.on('mesh_summary', updateSummary);
+
+        function addNode() {
+            const id = mesh.nodes.length ? Math.max(...mesh.nodes.map(n => n.id)) + 1 : 1;
+            socket.emit('add_node', {id, x: 100 + Math.random()*600, y: 100 + Math.random()*400});
+        }
+
+        function exportMatrix() {
+            fetch('/export').then(r => r.json()).then(data => {
+                alert('Connectivity Matrix:\n' + JSON.stringify(data, null, 2));
+            });
+        }
+
+        document.getElementById('mesh-canvas').addEventListener('mousedown', function(e) {
+            const rect = this.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const node = mesh.nodes.find(n => Math.hypot(n.x - x, n.y - y) < 12);
+            if (drawingConnection && connectionStart && node && node.id !== connectionStart.id) {
+                socket.emit('add_connection', {source: connectionStart.id, target: node.id});
+                drawingConnection = false;
+                connectionStart = null;
+            } else if (node) {
+                selectedNode = node;
+                drawMesh();
+            } else {
+                selectedNode = null;
+                drawMesh();
+            }
+        });
+
+        document.getElementById('mesh-canvas').addEventListener('dblclick', function(e) {
+            if (selectedNode) {
+                socket.emit('delete_node', {id: selectedNode.id});
+                selectedNode = null;
+            }
+        });
+
+        document.getElementById('mesh-canvas').addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            const rect = this.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const node = mesh.nodes.find(n => Math.hypot(n.x - x, n.y - y) < 12);
+            if (selectedNode && node && selectedNode.id !== node.id) {
+                socket.emit('delete_connection', {source: selectedNode.id, target: node.id});
+            }
+        });
+
+        document.getElementById('mesh-canvas').addEventListener('mousemove', function(e) {
+            if (selectedNode && e.buttons === 1) {
+                const rect = this.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                socket.emit('update_node', {id: selectedNode.id, x, y});
+            }
+        });
+
+        document.getElementById('mesh-canvas').addEventListener('mouseup', function(e) {
+            selectedNode = null;
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'c' && selectedNode) {
+                drawingConnection = true;
+                connectionStart = selectedNode;
+            }
+        });
+
+        socket.emit('get_mesh');
+    </script>
+</body>
+</html>
