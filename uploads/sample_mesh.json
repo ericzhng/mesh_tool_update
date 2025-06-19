@@ -1,0 +1,17 @@
+{
+  "mesh_name": "Sample Triangle",
+  "nodes": [
+    {"id": 1, "x": 200, "y": 200, "label": "A"},
+    {"id": 2, "x": 400, "y": 200, "label": "B"},
+    {"id": 3, "x": 300, "y": 400, "label": "C"}
+  ],
+  "connections": [
+    {"source": 1, "target": 2, "type": "edge"},
+    {"source": 2, "target": 3, "type": "edge"},
+    {"source": 3, "target": 1, "type": "edge"}
+  ],
+  "metadata": {
+    "created": "2025-06-19",
+    "author": "user"
+  }
+}
