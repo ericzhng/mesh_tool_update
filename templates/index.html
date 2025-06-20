@@ -3,162 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <title>2D Mesh Editor</title>
+    <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-        #mesh-canvas { border: 1px solid #888; background: #f9f9f9; }
-        #summary { margin: 1em; }
-        #controls { margin: 1em; }
-    </style>
 </head>
 <body>
     <h1>2D Mesh Editor</h1>
-    <div id="summary"></div>
-    <div id="controls">
-        <button onclick="addNode()">Add Node</button>
-        <button onclick="exportMatrix()">Export Connectivity Matrix</button>
-        <input type="file" id="mesh-file" accept=".csv,.json">
-        <button onclick="uploadMesh()">Load Mesh</button>
+    <div class="container">
+        <div class="left-panel">
+            <div style="position:relative;">
+                <canvas id="mesh-canvas" width="1200" height="900"></canvas>
+                <div id="zoom-controls" style="position:absolute;top:30px;right:40px;z-index:10;display:flex;flex-direction:column;gap:8px;align-items:flex-end;user-select:none;">
+                    <div id="zoom-group" style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+                        <button id="center-btn" style="width:38px;height:38px;border-radius:50%;border:none;background:#00b894;color:#fff;font-size:1.3em;box-shadow:0 2px 6px #0002;cursor:pointer;">⦿</button>
+                        <button id="zoom-in" style="width:38px;height:38px;border-radius:50%;border:none;background:#4f8cff;color:#fff;font-size:1.5em;box-shadow:0 2px 6px #0002;cursor:pointer;">+</button>
+                        <button id="zoom-out" style="width:38px;height:38px;border-radius:50%;border:none;background:#4f8cff;color:#fff;font-size:1.5em;box-shadow:0 2px 6px #0002;cursor:pointer;">-</button>
+                    </div>
+                </div>
+            </div>
+            <div id="message"></div>
+        </div>
+        <div class="right-panel">
+            <div class="group" id="file-group">
+                <div class="group-title">Mesh File</div>
+                <div class="group-content">
+                    <div id="file-name" style="font-size:0.98em;color:#555;margin-bottom:0.7em;min-height:1.2em;">No file chosen</div>
+                    <button class="modern-btn" id="load-mesh-btn" onclick="triggerFileInput()">Load Mesh</button>
+                    <input type="file" id="mesh-file" accept=".csv,.json,.inp,.deck" style="display:none;">
+                    <button class="modern-btn" onclick="showMesh()">Show Mesh</button>
+                    <button class="modern-btn" onclick="clearMesh()">Clear Mesh</button>
+                </div>
+            </div>
+            <div class="group" id="ops-group">
+                <div class="group-title">Node Manipulation</div>
+                <div class="group-content">
+                    <button class="modern-btn" onclick="addNode()">Add Node</button>
+                    <button class="modern-btn" onclick="exportMatrix()">Export Connectivity Matrix</button>
+                </div>
+            </div>
+            <div class="group" id="summary-group">
+                <div class="group-title">Status</div>
+                <div id="summary">No mesh loaded</div>
+            </div>
+        </div>
     </div>
-    <canvas id="mesh-canvas" width="800" height="600"></canvas>
-    <script>
-        const socket = io();
-        let mesh = {nodes: [], connections: []};
-        let selectedNode = null;
-        let drawingConnection = false;
-        let connectionStart = null;
-
-        function drawMesh() {
-            const canvas = document.getElementById('mesh-canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Draw connections
-            ctx.strokeStyle = '#0074D9';
-            ctx.lineWidth = 2;
-            mesh.connections.forEach(c => {
-                const n1 = mesh.nodes.find(n => n.id === c.source);
-                const n2 = mesh.nodes.find(n => n.id === c.target);
-                if (n1 && n2) {
-                    ctx.beginPath();
-                    ctx.moveTo(n1.x, n1.y);
-                    ctx.lineTo(n2.x, n2.y);
-                    ctx.stroke();
-                }
-            });
-            // Draw nodes
-            mesh.nodes.forEach(n => {
-                ctx.beginPath();
-                ctx.arc(n.x, n.y, 10, 0, 2 * Math.PI);
-                ctx.fillStyle = (selectedNode && selectedNode.id === n.id) ? '#FF4136' : '#2ECC40';
-                ctx.fill();
-                ctx.strokeStyle = '#111';
-                ctx.stroke();
-                ctx.fillStyle = '#111';
-                ctx.fillText(n.id, n.x - 5, n.y + 4);
-            });
-        }
-
-        function uploadMesh() {
-            const fileInput = document.getElementById('mesh-file');
-            if (!fileInput.files.length) {
-                alert('Please select a file.');
-                return;
-            }
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-            fetch('/load', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    alert('Mesh loaded successfully!');
-                    socket.emit('get_mesh');
-                } else {
-                    response.text().then(text => alert('Error: ' + text));
-                }
-            })
-            .catch(err => alert('Error: ' + err));
-        }
-
-        function updateSummary(summary) {
-            document.getElementById('summary').innerText = `Nodes: ${summary.num_nodes}, Connections: ${summary.num_connections}`;
-        }
-
-        socket.on('mesh_data', data => {
-            mesh = data;
-            drawMesh();
-        });
-        socket.on('mesh_summary', updateSummary);
-
-        function addNode() {
-            const id = mesh.nodes.length ? Math.max(...mesh.nodes.map(n => n.id)) + 1 : 1;
-            socket.emit('add_node', {id, x: 100 + Math.random()*600, y: 100 + Math.random()*400});
-        }
-
-        function exportMatrix() {
-            fetch('/export').then(r => r.json()).then(data => {
-                alert('Connectivity Matrix:\n' + JSON.stringify(data, null, 2));
-            });
-        }
-
-        document.getElementById('mesh-canvas').addEventListener('mousedown', function(e) {
-            const rect = this.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const node = mesh.nodes.find(n => Math.hypot(n.x - x, n.y - y) < 12);
-            if (drawingConnection && connectionStart && node && node.id !== connectionStart.id) {
-                socket.emit('add_connection', {source: connectionStart.id, target: node.id});
-                drawingConnection = false;
-                connectionStart = null;
-            } else if (node) {
-                selectedNode = node;
-                drawMesh();
-            } else {
-                selectedNode = null;
-                drawMesh();
-            }
-        });
-
-        document.getElementById('mesh-canvas').addEventListener('dblclick', function(e) {
-            if (selectedNode) {
-                socket.emit('delete_node', {id: selectedNode.id});
-                selectedNode = null;
-            }
-        });
-
-        document.getElementById('mesh-canvas').addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            const rect = this.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const node = mesh.nodes.find(n => Math.hypot(n.x - x, n.y - y) < 12);
-            if (selectedNode && node && selectedNode.id !== node.id) {
-                socket.emit('delete_connection', {source: selectedNode.id, target: node.id});
-            }
-        });
-
-        document.getElementById('mesh-canvas').addEventListener('mousemove', function(e) {
-            if (selectedNode && e.buttons === 1) {
-                const rect = this.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                socket.emit('update_node', {id: selectedNode.id, x, y});
-            }
-        });
-
-        document.getElementById('mesh-canvas').addEventListener('mouseup', function(e) {
-            selectedNode = null;
-        });
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'c' && selectedNode) {
-                drawingConnection = true;
-                connectionStart = selectedNode;
-            }
-        });
-
-        socket.emit('get_mesh');
-    </script>
+    <script src="/static/main.js"></script>
 </body>
 </html>

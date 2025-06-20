@@ -2,8 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
 import os
-import csv
-import json
+import mesh_io
 
 
 app = Flask(__name__)
@@ -16,7 +15,7 @@ mesh = {
 }
 
 UPLOAD_FOLDER = "uploads"
-ALLOWED_EXTENSIONS = {"csv", "json"}
+ALLOWED_EXTENSIONS = {"csv", "json", "inp", "deck"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -44,41 +43,16 @@ def load_mesh():
     file = request.files["file"]
     if file.filename == "":
         return "No selected file", 400
-    if file and allowed_file(file.filename):
+    if file and file.filename and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(filepath)
-        # Parse file
-        if filename.endswith(".csv"):
-            with open(filepath, newline="") as csvfile:
-                reader = csv.reader(csvfile)
-                nodes = []
-                connections = []
-                section = "nodes"
-                for row in reader:
-                    if not row or row[0].startswith("#"):
-                        continue
-                    if row[0].lower() == "connections":
-                        section = "connections"
-                        continue
-                    if section == "nodes":
-                        nodes.append(
-                            {"id": int(row[0]), "x": float(row[1]), "y": float(row[2])}
-                        )
-                    elif section == "connections":
-                        connections.append(
-                            {"source": int(row[0]), "target": int(row[1])}
-                        )
-                mesh["nodes"] = nodes
-                mesh["connections"] = connections
-        elif filename.endswith(".json"):
-            with open(filepath) as f:
-                data = json.load(f)
-                mesh["nodes"] = data.get("nodes", [])
-                mesh["connections"] = data.get("connections", [])
-                # Optionally, you can use mesh['metadata'] = data.get('metadata', {}) if you want to display metadata
-        socketio.emit("mesh_data", mesh, broadcast=True)
-        socketio.emit("mesh_summary", get_mesh_summary(), broadcast=True)
+        try:
+            mesh_data = mesh_io.read_mesh(filepath)
+            mesh["nodes"] = mesh_data["nodes"]
+            mesh["connections"] = mesh_data["connections"]
+        except Exception as e:
+            return f"Failed to parse mesh: {e}", 400
         return "Mesh loaded", 200
     return "Invalid file", 400
 
@@ -132,6 +106,14 @@ def handle_delete_connection(data):
         for c in mesh["connections"]
         if not (c["source"] == data["source"] and c["target"] == data["target"])
     ]
+    emit("mesh_data", mesh, broadcast=True)
+    emit("mesh_summary", get_mesh_summary(), broadcast=True)
+
+
+@socketio.on("clear_mesh")
+def handle_clear_mesh():
+    mesh["nodes"] = []
+    mesh["connections"] = []
     emit("mesh_data", mesh, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
