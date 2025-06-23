@@ -11,16 +11,16 @@
     <div class="container">
         <div class="left-panel">
             <div style="position:relative;">
-                <canvas id="mesh-canvas" width="1200" height="900"></canvas>
-                <div id="zoom-controls" style="position:absolute;top:30px;right:40px;z-index:10;display:flex;flex-direction:column;gap:8px;align-items:flex-end;user-select:none;">
-                    <div id="zoom-group" style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
-                        <button id="center-btn" style="width:38px;height:38px;border-radius:50%;border:none;background:#00b894;color:#fff;font-size:1.3em;box-shadow:0 2px 6px #0002;cursor:pointer;">⦿</button>
-                        <button id="zoom-in" style="width:38px;height:38px;border-radius:50%;border:none;background:#4f8cff;color:#fff;font-size:1.5em;box-shadow:0 2px 6px #0002;cursor:pointer;">+</button>
-                        <button id="zoom-out" style="width:38px;height:38px;border-radius:50%;border:none;background:#4f8cff;color:#fff;font-size:1.5em;box-shadow:0 2px 6px #0002;cursor:pointer;">-</button>
+                <canvas id="mesh-canvas" width="900" height="900"></canvas>
+                <div id="zoom-controls">
+                    <div id="zoom-group">
+                        <button id="center-btn" title="Center mesh">⦿</button>
+                        <button id="zoom-in" title="Zoom in">+</button>
+                        <button id="zoom-out" title="Zoom out">-</button>
                     </div>
                 </div>
+                <div id="message"></div>
             </div>
-            <div id="message"></div>
         </div>
         <div class="right-panel">
             <div class="group" id="file-group">

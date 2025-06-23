@@ -19,6 +19,8 @@ ALLOWED_EXTENSIONS = {"csv", "json", "inp", "deck"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+last_uploaded_file = {"path": ""}
+
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -51,10 +53,28 @@ def load_mesh():
             mesh_data = mesh_io.read_mesh(filepath)
             mesh["nodes"] = mesh_data["nodes"]
             mesh["connections"] = mesh_data["connections"]
+            last_uploaded_file["path"] = filepath  # remember last file
         except Exception as e:
             return f"Failed to parse mesh: {e}", 400
         return "Mesh loaded", 200
     return "Invalid file", 400
+
+
+@app.route("/last_mesh")
+def last_mesh():
+    # If mesh is empty but last file exists, reload it
+    if (
+        not mesh["nodes"]
+        and last_uploaded_file["path"]
+        and os.path.exists(last_uploaded_file["path"])
+    ):
+        try:
+            mesh_data = mesh_io.read_mesh(last_uploaded_file["path"])
+            mesh["nodes"] = mesh_data["nodes"]
+            mesh["connections"] = mesh_data["connections"]
+        except Exception:
+            pass
+    return jsonify(mesh)
 
 
 @socketio.on("get_mesh")
@@ -101,10 +121,14 @@ def handle_add_connection(data):
 
 @socketio.on("delete_connection")
 def handle_delete_connection(data):
+    # Remove both directions for undirected mesh
     mesh["connections"] = [
         c
         for c in mesh["connections"]
-        if not (c["source"] == data["source"] and c["target"] == data["target"])
+        if not (
+            (c["source"] == data["source"] and c["target"] == data["target"])
+            or (c["source"] == data["target"] and c["target"] == data["source"])
+        )
     ]
     emit("mesh_data", mesh, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
