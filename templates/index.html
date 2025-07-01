@@ -4,44 +4,43 @@
     <meta charset="UTF-8">
     <title>2D Mesh Editor</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
     <h1>2D Mesh Editor</h1>
     <div class="container">
         <div class="left-panel">
-            <div style="position:relative;">
+            <div id="canvas-container" style="position:relative; width:100%;">
                 <canvas id="mesh-canvas" width="900" height="900"></canvas>
                 <div id="zoom-controls">
-                    <div id="zoom-group">
-                        <button id="center-btn" title="Center mesh">⦿</button>
-                        <button id="zoom-in" title="Zoom in">+</button>
-                        <button id="zoom-out" title="Zoom out">-</button>
-                    </div>
+                    <button id="zoom-in" title="Zoom in">+</button>
+                    <button id="zoom-out" title="Zoom out">-</button>
+                    <button id="center-btn" title="Center mesh">⦿</button>
                 </div>
                 <div id="message"></div>
             </div>
         </div>
         <div class="right-panel">
             <div class="group" id="file-group">
-                <div class="group-title">Mesh File</div>
+                <div class="group-title">File Operations</div>
                 <div class="group-content">
-                    <div id="file-name" style="font-size:0.98em;color:#555;margin-bottom:0.7em;min-height:1.2em;">No file chosen</div>
+                    <div id="file-name" style="font-size:0.9em; color:#555; min-height:1.2em; text-align:center; background:#f0f0f0; padding:8px; border-radius:6px;">No file chosen</div>
                     <button class="modern-btn" id="load-mesh-btn" onclick="triggerFileInput()">Load Mesh</button>
                     <input type="file" id="mesh-file" accept=".csv,.json,.inp,.deck" style="display:none;">
-                    <button class="modern-btn" onclick="showMesh()">Show Mesh</button>
-                    <button class="modern-btn" onclick="clearMesh()">Clear Mesh</button>
+                    <button class="modern-btn" id="show-mesh-btn" onclick="showMesh()">Show Mesh</button>
+                    <button class="modern-btn" id="clear-mesh-btn" onclick="clearMesh()">Clear Mesh</button>
                 </div>
             </div>
             <div class="group" id="ops-group">
-                <div class="group-title">Node Manipulation</div>
+                <div class="group-title">Mesh Tools</div>
                 <div class="group-content">
                     <button class="modern-btn" onclick="addNode()">Add Node</button>
-                    <button class="modern-btn" onclick="exportMatrix()">Export Connectivity Matrix</button>
+                    <button class="modern-btn" onclick="exportMatrix()">Export Matrix</button>
                 </div>
             </div>
             <div class="group" id="summary-group">
-                <div class="group-title">Status</div>
+                <div class="group-title">Mesh Summary</div>
                 <div id="summary">No mesh loaded</div>
             </div>
         </div>
