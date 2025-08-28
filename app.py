@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
 import os
-import mesh_io
+import meshio.abaqusIO as abaqusIO
 
 
 app = Flask(__name__)
@@ -14,7 +14,7 @@ mesh = {
     "connections": [],  # [{'source': int, 'target': int}]
 }
 
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = "data"
 ALLOWED_EXTENSIONS = {"csv", "json", "inp", "deck"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -50,7 +50,7 @@ def load_mesh():
         filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(filepath)
         try:
-            mesh_data = mesh_io.read_mesh(filepath)
+            mesh_data = abaqusIO.read_mesh(filepath)
             mesh["nodes"] = mesh_data["nodes"]
             mesh["connections"] = mesh_data["connections"]
             last_uploaded_file["path"] = filepath  # remember last file
@@ -69,7 +69,7 @@ def last_mesh():
         and os.path.exists(last_uploaded_file["path"])
     ):
         try:
-            mesh_data = mesh_io.read_mesh(last_uploaded_file["path"])
+            mesh_data = abaqusIO.read_mesh(last_uploaded_file["path"])
             mesh["nodes"] = mesh_data["nodes"]
             mesh["connections"] = mesh_data["connections"]
         except Exception:
@@ -78,8 +78,8 @@ def last_mesh():
 
 
 @socketio.on("get_mesh")
-def handle_get_mesh():
-    emit("mesh_data", mesh)
+def handle_get_mesh(data):
+    emit("mesh_data", data)
 
 
 @socketio.on("add_node")
