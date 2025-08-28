@@ -13,11 +13,6 @@
         <div class="left-panel">
             <div id="canvas-container" style="position:relative; width:100%;">
                 <canvas id="mesh-canvas" width="900" height="900"></canvas>
-                <div id="zoom-controls">
-                    <button id="zoom-in" title="Zoom in">+</button>
-                    <button id="zoom-out" title="Zoom out">-</button>
-                    <button id="center-btn" title="Center mesh">⦿</button>
-                </div>
                 <div id="message"></div>
             </div>
         </div>
@@ -37,6 +32,10 @@
                 <div class="group-content">
                     <button class="modern-btn" onclick="addNode()">Add Node</button>
                     <button class="modern-btn" onclick="exportMatrix()">Export Matrix</button>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="show-labels-checkbox" checked>
+                        <label for="show-labels-checkbox">Show Node Labels</label>
+                    </div>
                 </div>
             </div>
             <div class="group" id="summary-group">

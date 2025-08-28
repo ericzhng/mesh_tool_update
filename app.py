@@ -78,8 +78,8 @@ def last_mesh():
 
 
 @socketio.on("get_mesh")
-def handle_get_mesh():
-    emit("mesh_data", mesh)
+def handle_get_mesh(data):
+    emit("mesh_data", data)
 
 
 @socketio.on("add_node")
