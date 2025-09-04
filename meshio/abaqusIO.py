@@ -5,6 +5,15 @@ import re
 
 
 def read_abaqus_inp(filepath):
+    """
+    Reads mesh data from an Abaqus input file (.inp).
+
+    Args:
+        filepath (str): The path to the .inp file.
+
+    Returns:
+        dict: A dictionary containing the mesh nodes and connections.
+    """
     nodes = []
     connections = []
     with open(filepath, "r") as f:
@@ -53,6 +62,17 @@ def read_abaqus_inp(filepath):
 
 
 def read_csv(filepath):
+    """
+    Reads mesh data from a CSV file.
+
+    The CSV file should have a 'nodes' section and a 'connections' section.
+
+    Args:
+        filepath (str): The path to the .csv file.
+
+    Returns:
+        dict: A dictionary containing the mesh nodes and connections.
+    """
     nodes = []
     connections = []
     section = "nodes"
@@ -74,17 +94,51 @@ def read_csv(filepath):
 
 
 def read_json(filepath):
+    """
+    Reads mesh data from a JSON file.
+
+    Args:
+        filepath (str): The path to the .json file.
+
+    Returns:
+        dict: A dictionary containing the mesh nodes and connections.
+    """
     with open(filepath) as f:
         data = json.load(f)
     return {"nodes": data.get("nodes", []), "connections": data.get("connections", [])}
 
 
 def read_deck(filepath):
+    """
+    Reads mesh data from a .deck file.
+
+    Treats .deck files as Abaqus .inp files.
+
+    Args:
+        filepath (str): The path to the .deck file.
+
+    Returns:
+        dict: A dictionary containing the mesh nodes and connections.
+    """
     # Treat deck files like Abaqus inp files for node/element parsing
     return read_abaqus_inp(filepath)
 
 
 def read_mesh(filepath):
+    """
+    Reads mesh data from a file, determining the file type by its extension.
+
+    Supported extensions: .inp, .deck, .csv, .json
+
+    Args:
+        filepath (str): The path to the mesh file.
+
+    Returns:
+        dict: A dictionary containing the mesh nodes and connections.
+
+    Raises:
+        ValueError: If the file extension is not supported.
+    """
     ext = os.path.splitext(filepath)[1].lower()
     if ext == ".inp":
         return read_abaqus_inp(filepath)

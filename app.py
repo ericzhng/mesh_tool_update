@@ -23,10 +23,12 @@ last_uploaded_file = {"path": ""}
 
 
 def allowed_file(filename):
+    """Checks if a file has an allowed extension."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def get_mesh_summary():
+    """Returns a summary of the current mesh."""
     return {
         "num_nodes": len(mesh["nodes"]),
         "num_connections": len(mesh["connections"]),
@@ -35,11 +37,13 @@ def get_mesh_summary():
 
 @app.route("/")
 def index():
+    """Renders the main page."""
     return render_template("index.html")
 
 
 @app.route("/load", methods=["POST"])
 def load_mesh():
+    """Loads a mesh from a file."""
     if "file" not in request.files:
         return "No file part", 400
     file = request.files["file"]
@@ -62,6 +66,7 @@ def load_mesh():
 
 @app.route("/last_mesh")
 def last_mesh():
+    """Returns the last loaded mesh."""
     # If mesh is empty but last file exists, reload it
     if (
         not mesh["nodes"]
@@ -79,11 +84,13 @@ def last_mesh():
 
 @socketio.on("get_mesh")
 def handle_get_mesh(data):
+    """Handles a request to get the current mesh."""
     emit("mesh_data", data)
 
 
 @socketio.on("add_node")
 def handle_add_node(data):
+    """Handles a request to add a node to the mesh."""
     mesh["nodes"].append(data)
     emit("mesh_data", mesh, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
@@ -91,6 +98,7 @@ def handle_add_node(data):
 
 @socketio.on("delete_node")
 def handle_delete_node(data):
+    """Handles a request to delete a node from the mesh."""
     node_id = data["id"]
     mesh["nodes"] = [n for n in mesh["nodes"] if n["id"] != node_id]
     mesh["connections"] = [
@@ -104,6 +112,7 @@ def handle_delete_node(data):
 
 @socketio.on("update_node")
 def handle_update_node(data):
+    """Handles a request to update a node in the mesh."""
     for n in mesh["nodes"]:
         if n["id"] == data["id"]:
             n["x"] = data["x"]
@@ -114,6 +123,7 @@ def handle_update_node(data):
 
 @socketio.on("add_connection")
 def handle_add_connection(data):
+    """Handles a request to add a connection to the mesh."""
     mesh["connections"].append(data)
     emit("mesh_data", mesh, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
@@ -121,6 +131,7 @@ def handle_add_connection(data):
 
 @socketio.on("delete_connection")
 def handle_delete_connection(data):
+    """Handles a request to delete a connection from the mesh."""
     # Remove both directions for undirected mesh
     mesh["connections"] = [
         c
@@ -136,6 +147,7 @@ def handle_delete_connection(data):
 
 @socketio.on("clear_mesh")
 def handle_clear_mesh():
+    """Handles a request to clear the mesh."""
     mesh["nodes"] = []
     mesh["connections"] = []
     emit("mesh_data", mesh, broadcast=True)
@@ -144,6 +156,7 @@ def handle_clear_mesh():
 
 @app.route("/export")
 def export_connectivity():
+    """Exports the connectivity matrix of the mesh."""
     return jsonify(mesh["connections"])
 
 

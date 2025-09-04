@@ -1,4 +1,9 @@
 
+/**
+ * @file This file contains the main client-side logic for the mesh visualization tool.
+ * @summary It handles user interactions, canvas drawing, and communication with the server via Socket.IO.
+ */
+
 const socket = io();
 
 // --- App state ---
@@ -91,6 +96,12 @@ class SpatialHashGrid {
 
 // --- UTILITY FUNCTIONS ---
 
+/**
+ * Shows a message to the user.
+ * @param {string} msg The message to show.
+ * @param {('info'|'success'|'error')} type The type of message.
+ * @param {number} duration The duration to show the message for.
+ */
 function showMessage(msg, type = 'info', duration = 3000) {
     messageDiv.textContent = msg;
     messageDiv.className = 'show';
@@ -98,11 +109,18 @@ function showMessage(msg, type = 'info', duration = 3000) {
     setTimeout(() => { messageDiv.className = ''; }, duration);
 }
 
+/**
+ * Updates the state of the buttons.
+ */
 function updateButtonStates() {
     showMeshBtn.disabled = !appState.meshLoaded || appState.meshDisplayed;
     clearMeshBtn.disabled = !appState.meshDisplayed;
 }
 
+/**
+ * Updates the summary of the mesh.
+ * @param {{num_nodes: number, num_connections: number}} summary The mesh summary.
+ */
 function updateSummary(summary) {
     summaryDiv.innerHTML = (summary.num_nodes > 0 || summary.num_connections > 0) ? 
         `Nodes: <strong>${summary.num_nodes}</strong>, Connections: <strong>${summary.num_connections}</strong>` : 'No mesh loaded';
@@ -110,6 +128,9 @@ function updateSummary(summary) {
 
 // --- CORE API FUNCTIONS ---
 
+/**
+ * Triggers the file input.
+ */
 function triggerFileInput() {
     document.getElementById('mesh-file').click();
 }
@@ -123,6 +144,9 @@ document.getElementById('mesh-file').addEventListener('change', function() {
     }
 });
 
+/**
+ * Uploads the mesh file to the server.
+ */
 function uploadMesh() {
     const fileInput = document.getElementById('mesh-file');
     if (!fileInput.files.length) return showMessage('Please select a file first.', 'error');
@@ -149,6 +173,9 @@ function uploadMesh() {
         });
 }
 
+/**
+ * Shows the mesh on the canvas.
+ */
 function showMesh() {
     if (!appState.meshLoaded) return showMessage('Please load a mesh file first.', 'error');
     if (appState.meshDisplayed) return showMessage('Mesh is already displayed.', 'info');
@@ -171,11 +198,17 @@ function showMesh() {
     });
 }
 
+/**
+ * Clears the mesh from the canvas.
+ */
 function clearMesh() {
     if (!appState.meshDisplayed) return showMessage('There is no mesh to clear.', 'error');
     socket.emit('clear_mesh');
 }
 
+/**
+ * Exports the connectivity matrix to the console.
+ */
 function exportMatrix() {
     if (!appState.meshDisplayed) return showMessage('Please load and show a mesh before exporting.', 'error');
     fetch('/export').then(r => r.json()).then(data => {
@@ -221,8 +254,15 @@ socket.on('mesh_summary', updateSummary);
 
 // --- INITIALIZATION ---
 
+/**
+ * Gets the device pixel ratio.
+ * @returns {number} The device pixel ratio.
+ */
 const getDevicePixelRatio = () => window.devicePixelRatio || 1;
 
+/**
+ * Resizes the canvas to fit the screen.
+ */
 function resizeCanvas() {
     const dpr = getDevicePixelRatio();
     const rect = canvas.getBoundingClientRect();
@@ -252,6 +292,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // --- DRAWING AND CANVAS ---
 
+/**
+ * Schedules a redraw of the mesh.
+ */
 function scheduleDrawMesh() {
     if (!drawPending) {
         drawPending = true;
@@ -262,6 +305,12 @@ function scheduleDrawMesh() {
     }
 }
 
+/**
+ * Converts world coordinates to screen coordinates.
+ * @param {number} x The x coordinate in world space.
+ * @param {number} y The y coordinate in world space.
+ * @returns {{x: number, y: number}} The coordinates in screen space.
+ */
 function toScreen(x, y) { // world -> css pixels
     const cosR = Math.cos(view.rotation), sinR = Math.sin(view.rotation);
     return {
@@ -270,6 +319,12 @@ function toScreen(x, y) { // world -> css pixels
     };
 }
 
+/**
+ * Converts screen coordinates to world coordinates.
+ * @param {number} x The x coordinate in screen space.
+ * @param {number} y The y coordinate in screen space.
+ * @returns {{x: number, y: number}} The coordinates in world space.
+ */
 function toWorld(x, y) { // css pixels -> world
     const sx = (x - view.offsetX) / view.scale;
     const sy = (y - view.offsetY) / view.scale;
@@ -277,6 +332,11 @@ function toWorld(x, y) { // css pixels -> world
     return { x: sx * cosR - sy * sinR, y: sx * sinR + sy * cosR };
 }
 
+/**
+ * Gets the step for the ruler.
+ * @param {number} scale The current scale of the view.
+ * @returns {number} The step for the ruler.
+ */
 function getRulerStep(scale) {
     const minPxPerStep = 50;
     const stepValues = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000];
@@ -284,6 +344,9 @@ function getRulerStep(scale) {
     return stepValues.find(v => v > idealStep) || stepValues[stepValues.length - 1];
 }
 
+/**
+ * Draws the rulers on the canvas.
+ */
 function drawRulers() {
     const viewWidth = canvas.getBoundingClientRect().width;
     const viewHeight = canvas.getBoundingClientRect().height;
@@ -338,6 +401,9 @@ function drawRulers() {
     ctx.restore();
 }
 
+/**
+ * Draws the mesh on the canvas.
+ */
 function drawMesh() {
     const rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
@@ -395,6 +461,10 @@ function drawMesh() {
     ctx.restore();
 }
 
+/**
+ * Centers and draws the mesh on the canvas.
+ * @param {{nodes: Array<{x: number, y: number}>}} data The mesh data.
+ */
 function centerAndDrawMesh(data) {
     if (!data.nodes.length) return;
     const rect = canvas.getBoundingClientRect();
@@ -419,6 +489,11 @@ function centerAndDrawMesh(data) {
 
 // --- CANVAS EVENT HANDLERS ---
 
+/**
+ * Gets the mouse position on the canvas.
+ * @param {MouseEvent} e The mouse event.
+ * @returns {{x: number, y: number}} The mouse position.
+ */
 function getMousePos(e) {
     const rect = canvas.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -542,6 +617,9 @@ window.addEventListener('keydown', e => {
 });
 
 // --- NODE/CONNECTION TOOLS ---
+/**
+ * Adds a new node to the center of the view.
+ */
 function addNode() {
     const rect = canvas.getBoundingClientRect();
     const worldPos = toWorld(rect.width / 2, rect.height / 2);
