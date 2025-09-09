@@ -5,13 +5,17 @@
     let isPanning = false;
     let isRotating = false;
     let panStart = { x: 0, y: 0 };
-    let selectedNodes = []; // Changed from selectedNode = null
+    let selectedNodes = [];
     let draggingNode = null;
     let isDraggingNode = false;
     let dragOffset = { x: 0, y: 0 };
     let isSelecting = false;
     let selectStart = { x: 0, y: 0 };
     let selectRect = null;
+
+    // New flags for selection modes
+    let isCtrlSelecting = false; // For Ctrl/Cmd + drag (deselection)
+    let isShiftSelecting = false; // For Shift + drag (addition)
 
     function getDevicePixelRatio() {
         return window.devicePixelRatio || 1;
@@ -103,7 +107,7 @@
             // Draw elements and their labels
             mesh.elements.forEach(elem => {
                 const elementNodes = elem.node_ids.map(id => nodesMap.get(id)).filter(n => n);
-                if (elementNodes.length > 1) { // Must have at least 2 nodes
+                if (elementNodes.length > 1) {
 
                     // Draw edges of the element
                     ctx.beginPath();
@@ -116,11 +120,11 @@
                         }
                     });
 
-                    if (elementNodes.length > 2) { // 2D element
+                    if (elementNodes.length > 2) {
                         ctx.closePath();
                         ctx.strokeStyle = 'rgba(0, 39, 76, 0.6)';
                         ctx.lineWidth = 1;
-                    } else { // 1D element
+                    } else {
                         ctx.strokeStyle = 'red';
                         ctx.lineWidth = 2;
                     }
@@ -131,11 +135,11 @@
                         const centroid = getCentroid(elem.node_ids);
                         const pCentroid = toScreen(centroid.x, centroid.y);
 
-                        if (elementNodes.length === 2) { // 1D element
+                        if (elementNodes.length === 2) {
                             ctx.fillStyle = 'green';
                             ctx.font = 'bold 10px sans-serif';
                         }
-                        else { // 2D element
+                        else {
                             ctx.fillStyle = 'purple';
                             ctx.font = 'italic 10px sans-serif';
                         }
@@ -287,13 +291,22 @@
                 }
             }
             
+            // Reset selection flags
+            isCtrlSelecting = e.ctrlKey || e.metaKey;
+            isShiftSelecting = e.shiftKey;
+
             if (clickedNode) {
-                if (e.ctrlKey || e.metaKey) { // Ctrl/Cmd click to toggle selection
+                if (isCtrlSelecting) { // Ctrl/Cmd click to toggle selection
                     const index = selectedNodes.indexOf(clickedNode);
                     if (index > -1) {
                         selectedNodes.splice(index, 1); // Remove if already selected
                     } else {
                         selectedNodes.push(clickedNode); // Add if not selected
+                    }
+                } else if (isShiftSelecting) { // Shift click to add to selection
+                    // For now, just add. Range selection is more complex. This will be handled in mouseup for rect select.
+                    if (!selectedNodes.includes(clickedNode)) {
+                        selectedNodes.push(clickedNode);
                     }
                 } else { // Single click to select only this node
                     selectedNodes = [clickedNode];
@@ -302,7 +315,9 @@
                 isDraggingNode = true;
                 dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
             } else { // Clicked on empty space, start rect select
-                selectedNodes = []; // Clear selection on empty click
+                if (!isCtrlSelecting && !isShiftSelecting) {
+                    selectedNodes = []; // Clear selection on empty click if no modifier
+                }
                 isSelecting = true;
                 selectStart = pos;
             }
@@ -359,7 +374,7 @@
             const queryMax = [maxWorldX, maxWorldY];
 
             const nodesInRectCandidate = spatialGrid ? spatialGrid.query({ min: queryMin, max: queryMax }) : [];
-            const nodesInRect = [];
+            let nodesInRect = [];
 
             // Perform a precise check to ensure nodes are actually within the screen-drawn selectRect
             nodesInRectCandidate.forEach(node => {
@@ -370,15 +385,19 @@
                 }
             });
 
-            if (e.ctrlKey || e.metaKey) { // Ctrl/Cmd click to toggle selection
+            // Apply selection based on modifier keys
+            if (isCtrlSelecting) { // Ctrl/Cmd drag for deselection
+                const currentSelection = new Set(selectedNodes);
                 nodesInRect.forEach(node => {
-                    const index = selectedNodes.indexOf(node);
-                    if (index > -1) {
-                        selectedNodes.splice(index, 1);
-                    } else {
-                        selectedNodes.push(node);
-                    }
+                    currentSelection.delete(node);
                 });
+                selectedNodes = Array.from(currentSelection);
+            } else if (isShiftSelecting) { // Shift drag for addition
+                const currentSelection = new Set(selectedNodes);
+                nodesInRect.forEach(node => {
+                    currentSelection.add(node);
+                });
+                selectedNodes = Array.from(currentSelection);
             } else { // Regular rect select, replace current selection
                 selectedNodes = nodesInRect;
             }
@@ -390,6 +409,10 @@
         isSelecting = false;
         selectRect = null;
         canvas.style.cursor = 'crosshair';
+
+        // Clear selection flags
+        isCtrlSelecting = false;
+        isShiftSelecting = false;
 
         if (e.button === 2) { // Right click released
             showContextMenu(e);
