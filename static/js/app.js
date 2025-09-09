@@ -31,7 +31,7 @@ socket.on('mesh_data', data => {
         showMessage('Mesh cleared.', 'success');
     }
 
-    if (!isDeleting) {
+    if (!isDeleting && !isDraggingNode) {
         centerAndDrawMesh(mesh);
     }
     isDeleting = false;

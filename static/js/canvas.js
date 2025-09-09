@@ -242,6 +242,7 @@ canvas.addEventListener('mousedown', e => {
         if (clickedNode) {
             selectedNode = clickedNode;
             draggingNode = clickedNode;
+            isDraggingNode = true;
             dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
         } else {
             isSelecting = true;
@@ -279,6 +280,7 @@ window.addEventListener('mouseup', e => {
         // Logic for selecting nodes in rect will be added later
     }
     draggingNode = null;
+    isDraggingNode = false;
     isPanning = false;
     isRotating = false;
     isSelecting = false;

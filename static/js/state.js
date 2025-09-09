@@ -16,6 +16,7 @@ const lod = {
 
 let selectedNode = null;
 let draggingNode = null;
+let isDraggingNode = false;
 let dragOffset = { x: 0, y: 0 };
 let isPanning = false;
 let isZooming = false;
