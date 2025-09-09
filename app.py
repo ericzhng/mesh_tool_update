@@ -32,7 +32,7 @@ def get_mesh_summary():
     """Returns a summary of the current mesh."""
     return {
         "num_nodes": len(mesh["nodes"]),
-        "num_connections": len(mesh["connections"]),
+        "num_lines": len(mesh["connections"]),
         "num_elements": len(mesh["elements"]),
     }
 
@@ -89,7 +89,7 @@ def last_mesh():
 @socketio.on("get_mesh")
 def handle_get_mesh(data):
     """Handles a request to get the current mesh."""
-    emit("mesh_data", {"mesh": data, "isDragging": False})
+    emit("mesh_data", {"mesh": mesh, "isDragging": False}) # Changed 'data' to 'mesh'
 
 
 @socketio.on("add_node")
@@ -108,7 +108,10 @@ def handle_delete_node(data):
     mesh["connections"] = [
         c
         for c in mesh["connections"]
-        if c["source"] != node_id and c["target"] != node_id
+        if not (
+            (c["source"] == node_id and c["target"] == node_id)
+            or (c["source"] == node_id and c["target"] == node_id)
+        )
     ]
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)

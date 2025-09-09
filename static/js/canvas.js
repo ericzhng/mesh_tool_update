@@ -5,14 +5,13 @@
     let isPanning = false;
     let isRotating = false;
     let panStart = { x: 0, y: 0 };
-    let selectedNode = null;
+    let selectedNodes = []; // Changed from selectedNode = null
     let draggingNode = null;
     let isDraggingNode = false;
     let dragOffset = { x: 0, y: 0 };
     let isSelecting = false;
     let selectStart = { x: 0, y: 0 };
     let selectRect = null;
-    // Removed: rightClickDown, rightClickStartX, rightClickStartY, CONTEXT_MENU_THRESHOLD
 
     function getDevicePixelRatio() {
         return window.devicePixelRatio || 1;
@@ -177,8 +176,15 @@
             const p = toScreen(n.x, n.y);
             ctx.beginPath();
             ctx.arc(p.x, p.y, nodeRadius, 0, 2 * Math.PI);
-            ctx.fillStyle = (selectedNode && selectedNode.id === n.id) ? '#FFCB05' : '#00274C';
+            
+            // Set fill style based on selection
+            if (selectedNodes.includes(n)) {
+                ctx.fillStyle = selectedNodes.length === 1 ? '#00FF00' : '#00FFFF'; // Lime green for single, Cyan for multiple
+            } else {
+                ctx.fillStyle = '#00274C'; // Default color
+            }
             ctx.fill();
+
             if (showNodeLabels) {
                 ctx.fillStyle = 'black';
                 ctx.fillText(n.id, p.x + nodeRadius + 2, p.y);
@@ -280,13 +286,23 @@
                     }
                 }
             }
+            
             if (clickedNode) {
-                selectedNode = clickedNode;
-                draggingNode = clickedNode;
+                if (e.ctrlKey || e.metaKey) { // Ctrl/Cmd click to toggle selection
+                    const index = selectedNodes.indexOf(clickedNode);
+                    if (index > -1) {
+                        selectedNodes.splice(index, 1); // Remove if already selected
+                    } else {
+                        selectedNodes.push(clickedNode); // Add if not selected
+                    }
+                } else { // Single click to select only this node
+                    selectedNodes = [clickedNode];
+                }
+                draggingNode = clickedNode; // Allow dragging of the clicked node
                 isDraggingNode = true;
                 dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
-            }
-            else {
+            } else { // Clicked on empty space, start rect select
+                selectedNodes = []; // Clear selection on empty click
                 isSelecting = true;
                 selectStart = pos;
             }
@@ -326,8 +342,27 @@
     }, 16));
 
     window.addEventListener('mouseup', e => {
-        if (isSelecting && selectRect && (selectRect.w > 10 || selectRect.h > 10)) {
-            // Logic for selecting nodes in rect will be added later
+        if (isSelecting && selectRect) { // Only process if a selection rectangle was drawn
+            const rectWorldMin = toWorld(selectRect.x, selectRect.y);
+            const rectWorldMax = toWorld(selectRect.x + selectRect.w, selectRect.y + selectRect.h);
+
+            const queryMin = [Math.min(rectWorldMin.x, rectWorldMax.x), Math.min(rectWorldMin.y, rectWorldMax.y)];
+            const queryMax = [Math.max(rectWorldMin.x, rectWorldMax.x), Math.max(rectWorldMin.y, rectWorldMax.y)];
+
+            const nodesInRect = spatialGrid ? spatialGrid.query({ min: queryMin, max: queryMax }) : [];
+
+            if (e.ctrlKey || e.metaKey) { // Ctrl/Cmd click to toggle selection
+                nodesInRect.forEach(node => {
+                    const index = selectedNodes.indexOf(node);
+                    if (index > -1) {
+                        selectedNodes.splice(index, 1);
+                    } else {
+                        selectedNodes.push(node);
+                    }
+                });
+            } else { // Regular rect select, replace current selection
+                selectedNodes = nodesInRect;
+            }
         }
         draggingNode = null;
         isDraggingNode = false;

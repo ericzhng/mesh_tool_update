@@ -8,6 +8,8 @@ socket.on('mesh_data', data => {
     const meshData = data.mesh || data;
     const isDragging = data.isDragging || false;
 
+    // console.log('Received meshData:', meshData); // Added for debugging
+
     mesh.nodes = meshData.nodes || [];
     mesh.connections = meshData.connections || [];
     mesh.elements = meshData.elements || [];
@@ -42,7 +44,7 @@ socket.on('mesh_data', data => {
     isDeleting = false;
 
     scheduleDrawMesh();
-    updateSummary(get_mesh_summary());
+    updateSummary(); // Removed argument
 });
 
 socket.on('mesh_summary', updateSummary);
@@ -85,11 +87,10 @@ function removeConnection() {
     showMessage('Remove Connection functionality not yet implemented.', 'info');
 }
 
-function get_mesh_summary() {
-    return {
-        num_nodes: mesh.nodes.length,
-        num_connections: mesh.connections.length,
-    };
+function updateSummary() { // Removed argument
+    const summaryDiv = document.getElementById('summary');
+    summaryDiv.innerHTML = (mesh.nodes.length > 0 || mesh.connections.length > 0 || mesh.elements.length > 0) ? 
+        `Nodes: <strong>${mesh.nodes.length}</strong>, Lines: <strong>${mesh.connections.length}</strong>, Elements: <strong>${mesh.elements.length}</strong>` : 'No mesh loaded';
 }
 
 // --- EVENT LISTENERS ---
