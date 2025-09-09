@@ -182,23 +182,44 @@ function drawMesh() {
 }
 
 function centerAndDrawMesh(data) {
-    if (!data.nodes.length) return;
+    if (!data.nodes || !data.nodes.length) return;
     const rect = canvas.getBoundingClientRect();
 
+    const cosR = Math.cos(view.rotation);
+    const sinR = Math.sin(view.rotation);
+
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    data.nodes.forEach(n => {
-        minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x);
-        minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y);
+
+    const rotatedNodes = data.nodes.map(n => {
+        return {
+            x: n.x * cosR - n.y * sinR,
+            y: n.x * sinR + n.y * cosR
+        };
     });
 
-    const meshWidth = maxX - minX, meshHeight = maxY - minY;
-    const scaleX = rect.width / meshWidth;
-    const scaleY = rect.height / meshHeight;
-    view.scale = Math.min(scaleX, scaleY) * 0.9;
+    rotatedNodes.forEach(n => {
+        minX = Math.min(minX, n.x);
+        maxX = Math.max(maxX, n.x);
+        minY = Math.min(minY, n.y);
+        maxY = Math.max(maxY, n.y);
+    });
 
-    const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
-    view.offsetX = -centerX * view.scale + rect.width / 2;
-    view.offsetY = -centerY * view.scale + rect.height / 2;
+    const meshWidth = maxX - minX;
+    const meshHeight = maxY - minY;
+
+    if (meshWidth === 0 || meshHeight === 0) {
+        view.scale = 1;
+    } else {
+        const scaleX = rect.width / meshWidth;
+        const scaleY = rect.height / meshHeight;
+        view.scale = Math.min(scaleX, scaleY) * 0.9;
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    view.offsetX = rect.width / 2 - centerX * view.scale;
+    view.offsetY = rect.height / 2 - centerY * view.scale;
 
     scheduleDrawMesh();
 }
@@ -265,7 +286,7 @@ canvas.addEventListener('mousemove', throttle(e => {
     } else if (draggingNode) {
         const worldPos = toWorld(pos.x, pos.y);
         const newX = worldPos.x + dragOffset.x, newY = worldPos.y + dragOffset.y;
-        socket.emit('update_node', { id: draggingNode.id, x: newX, y: newY });
+        socket.emit('update_node', { id: draggingNode.id, x: newX, y: newY, isDragging: true });
     } else if (isSelecting) {
         selectRect = {
             x: Math.min(selectStart.x, pos.x), y: Math.min(selectStart.y, pos.y),

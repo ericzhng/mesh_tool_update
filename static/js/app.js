@@ -5,8 +5,13 @@ let isDeleting = false;
 // --- SOCKET.IO HANDLERS ---
 
 socket.on('mesh_data', data => {
-    mesh = data;
-    mesh.elements = data.elements; // Populate elements array
+    const meshData = data.mesh || data;
+    const isDragging = data.isDragging || false;
+
+    mesh.nodes = meshData.nodes || [];
+    mesh.connections = meshData.connections || [];
+    mesh.elements = meshData.elements || [];
+    
     nodesMap = new Map(mesh.nodes.map(n => [n.id, n]));
 
     if (mesh.nodes.length > 0) {
@@ -31,7 +36,7 @@ socket.on('mesh_data', data => {
         showMessage('Mesh cleared.', 'success');
     }
 
-    if (!isDeleting && !isDraggingNode) {
+    if (!isDeleting && !isDragging) {
         centerAndDrawMesh(mesh);
     }
     isDeleting = false;

@@ -59,7 +59,7 @@ def load_mesh():
             mesh_data = abaqusIO.read_mesh(filepath)
             mesh["nodes"] = mesh_data["nodes"]
             mesh["connections"] = mesh_data["connections"]
-            mesh["elements"] = mesh_data["elements"]
+            mesh["elements"] = mesh_data.get("elements", [])
             last_uploaded_file["path"] = filepath  # remember last file
         except Exception as e:
             return f"Failed to parse mesh: {e}", 400
@@ -80,7 +80,7 @@ def last_mesh():
             mesh_data = abaqusIO.read_mesh(last_uploaded_file["path"])
             mesh["nodes"] = mesh_data["nodes"]
             mesh["connections"] = mesh_data["connections"]
-            mesh["elements"] = mesh_data["elements"]
+            mesh["elements"] = mesh_data.get("elements", [])
         except Exception:
             pass
     return jsonify(mesh)
@@ -89,14 +89,14 @@ def last_mesh():
 @socketio.on("get_mesh")
 def handle_get_mesh(data):
     """Handles a request to get the current mesh."""
-    emit("mesh_data", data)
+    emit("mesh_data", {"mesh": data, "isDragging": False})
 
 
 @socketio.on("add_node")
 def handle_add_node(data):
     """Handles a request to add a node to the mesh."""
     mesh["nodes"].append(data)
-    emit("mesh_data", mesh, broadcast=True)
+    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
@@ -110,7 +110,7 @@ def handle_delete_node(data):
         for c in mesh["connections"]
         if c["source"] != node_id and c["target"] != node_id
     ]
-    emit("mesh_data", mesh, broadcast=True)
+    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
@@ -121,7 +121,8 @@ def handle_update_node(data):
         if n["id"] == data["id"]:
             n["x"] = data["x"]
             n["y"] = data["y"]
-    emit("mesh_data", mesh, broadcast=True)
+    is_dragging = data.get("isDragging", False)
+    emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
@@ -129,7 +130,7 @@ def handle_update_node(data):
 def handle_add_connection(data):
     """Handles a request to add a connection to the mesh."""
     mesh["connections"].append(data)
-    emit("mesh_data", mesh, broadcast=True)
+    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
@@ -145,7 +146,7 @@ def handle_delete_connection(data):
             or (c["source"] == data["target"] and c["target"] == data["source"])
         )
     ]
-    emit("mesh_data", mesh, broadcast=True)
+    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
@@ -155,7 +156,7 @@ def handle_clear_mesh():
     mesh["nodes"] = []
     mesh["connections"] = []
     mesh["elements"] = []
-    emit("mesh_data", mesh, broadcast=True)
+    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
