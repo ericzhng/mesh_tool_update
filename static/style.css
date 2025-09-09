@@ -206,6 +206,19 @@ h1 {
     color: var(--primary-dark);
 }
 
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0.8em 1.5em;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.context-menu-item:hover {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+}
+
 @media (max-width: 1200px) {
     .container {
         flex-direction: column;

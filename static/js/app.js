@@ -114,10 +114,10 @@ window.addEventListener('click', e => {
     }
 });
 
-document.getElementById('rotate-cw').addEventListener('click', () => {
-    rotateView(Math.PI / 2);
-});
-
-document.getElementById('rotate-ccw').addEventListener('click', () => {
-    rotateView(-Math.PI / 2);
-});
+function toggleCheckboxAndRedraw(checkboxId) {
+    const checkbox = document.getElementById(checkboxId);
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        scheduleDrawMesh();
+    }
+}
