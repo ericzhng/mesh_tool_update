@@ -343,13 +343,32 @@
 
     window.addEventListener('mouseup', e => {
         if (isSelecting && selectRect) { // Only process if a selection rectangle was drawn
-            const rectWorldMin = toWorld(selectRect.x, selectRect.y);
-            const rectWorldMax = toWorld(selectRect.x + selectRect.w, selectRect.y + selectRect.h);
+            // Transform all four corners of the screen selectRect to world coordinates
+            const p1 = toWorld(selectRect.x, selectRect.y);
+            const p2 = toWorld(selectRect.x + selectRect.w, selectRect.y);
+            const p3 = toWorld(selectRect.x, selectRect.y + selectRect.h);
+            const p4 = toWorld(selectRect.x + selectRect.w, selectRect.y + selectRect.h);
 
-            const queryMin = [Math.min(rectWorldMin.x, rectWorldMax.x), Math.min(rectWorldMin.y, rectWorldMax.y)];
-            const queryMax = [Math.max(rectWorldMin.x, rectWorldMax.x), Math.max(rectWorldMin.y, rectWorldMax.y)];
+            // Calculate the true min/max world coordinates from these four transformed corners
+            const minWorldX = Math.min(p1.x, p2.x, p3.x, p4.x);
+            const maxWorldX = Math.max(p1.x, p2.x, p3.x, p4.x);
+            const minWorldY = Math.min(p1.y, p2.y, p3.y, p4.y);
+            const maxWorldY = Math.max(p1.y, p2.y, p3.y, p4.y);
 
-            const nodesInRect = spatialGrid ? spatialGrid.query({ min: queryMin, max: queryMax }) : [];
+            const queryMin = [minWorldX, minWorldY];
+            const queryMax = [maxWorldX, maxWorldY];
+
+            const nodesInRectCandidate = spatialGrid ? spatialGrid.query({ min: queryMin, max: queryMax }) : [];
+            const nodesInRect = [];
+
+            // Perform a precise check to ensure nodes are actually within the screen-drawn selectRect
+            nodesInRectCandidate.forEach(node => {
+                const screenPos = toScreen(node.x, node.y);
+                if (screenPos.x >= selectRect.x && screenPos.x <= (selectRect.x + selectRect.w) &&
+                    screenPos.y >= selectRect.y && screenPos.y <= (selectRect.y + selectRect.h)) {
+                    nodesInRect.push(node);
+                }
+            });
 
             if (e.ctrlKey || e.metaKey) { // Ctrl/Cmd click to toggle selection
                 nodesInRect.forEach(node => {
@@ -373,7 +392,7 @@
         canvas.style.cursor = 'crosshair';
 
         if (e.button === 2) { // Right click released
-            showContextMenu(e); // Always show context menu on right-click release
+            showContextMenu(e);
         }
         scheduleDrawMesh();
     });
