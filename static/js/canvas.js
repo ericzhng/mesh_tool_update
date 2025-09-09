@@ -72,34 +72,11 @@ function drawMesh() {
     
     const visibleNodes = spatialGrid ? spatialGrid.query(queryBounds) : [];
 
-    // Draw connections (from explicit connections)
-    mesh.connections.forEach(c => {
-        const n1 = nodesMap.get(c.source);
-        const n2 = nodesMap.get(c.target);
-        if (n1 && n2) {
-            const p1 = toScreen(n1.x, n1.y), p2 = toScreen(n2.x, n2.y);
-            const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-            if (dist < 1) return;
-
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = 'rgba(0, 39, 76, 0.6)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-    });
-
-    // Draw connections (from elements) and element labels
-    if (document.getElementById('show-element-labels-checkbox').checked && view.scale >= lod.labelThreshold) {
-        ctx.fillStyle = '#000'; // Black color for labels
-        mesh.elements.forEach(elem => { // Iterate through elements
+    if (mesh.elements && mesh.elements.length > 0) {
+        // Draw elements and their labels
+        mesh.elements.forEach(elem => {
             const elementNodes = elem.node_ids.map(id => nodesMap.get(id)).filter(n => n);
-            if (elementNodes.length > 0) {
-                // Calculate centroid
-                const centroid = getCentroid(elem.node_ids);
-                const pCentroid = toScreen(centroid.x, centroid.y);
-                ctx.fillText(elem.id.toString(), pCentroid.x, pCentroid.y);
+            if (elementNodes.length > 1) { // Must have at least 2 nodes
 
                 // Draw edges of the element
                 ctx.beginPath();
@@ -111,8 +88,51 @@ function drawMesh() {
                         ctx.lineTo(p.x, p.y);
                     }
                 });
-                ctx.closePath();
-                ctx.strokeStyle = 'rgba(0, 39, 76, 0.6)'; // Same color as other connections
+
+                if (elementNodes.length > 2) { // 2D element
+                    ctx.closePath();
+                    ctx.strokeStyle = 'rgba(0, 39, 76, 0.6)';
+                    ctx.lineWidth = 1;
+                } else { // 1D element
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 2;
+                }
+                ctx.stroke();
+
+                // Draw label
+                if (document.getElementById('show-element-labels-checkbox').checked && view.scale >= lod.labelThreshold) {
+                    const centroid = getCentroid(elem.node_ids);
+                    const pCentroid = toScreen(centroid.x, centroid.y);
+
+                    if (elementNodes.length === 2) { // 1D element
+                        ctx.fillStyle = 'green';
+                        ctx.font = 'bold 10px sans-serif';
+                    } else { // 2D element
+                        ctx.fillStyle = 'purple';
+                        ctx.font = 'italic 10px sans-serif';
+                    }
+                    ctx.fillText(`E${elem.id}`, pCentroid.x, pCentroid.y);
+                }
+            }
+        });
+        // Reset font after the loop
+        if (document.getElementById('show-element-labels-checkbox').checked && view.scale >= lod.labelThreshold) {
+            ctx.font = '10px sans-serif'; // Reset font
+        }
+    } else if (mesh.connections && mesh.connections.length > 0) {
+        // Draw connections if no elements are present
+        mesh.connections.forEach(c => {
+            const n1 = nodesMap.get(c.source);
+            const n2 = nodesMap.get(c.target);
+            if (n1 && n2) {
+                const p1 = toScreen(n1.x, n1.y), p2 = toScreen(n2.x, n2.y);
+                const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                if (dist < 1) return;
+
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.strokeStyle = 'rgba(0, 39, 76, 0.6)';
                 ctx.lineWidth = 1;
                 ctx.stroke();
             }
@@ -130,7 +150,7 @@ function drawMesh() {
         ctx.fillStyle = (selectedNode && selectedNode.id === n.id) ? '#FFCB05' : '#00274C';
         ctx.fill();
         if (showNodeLabels) {
-            ctx.fillStyle = '#000';
+            ctx.fillStyle = 'black';
             ctx.fillText(n.id, p.x + nodeRadius + 2, p.y);
         }
     });
