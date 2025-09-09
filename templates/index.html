@@ -1,49 +1,93 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="bg-gray-100">
 <head>
     <meta charset="UTF-8">
     <title>2D Mesh Editor</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
 </head>
-<body>
-    <h1>2D Mesh Editor</h1>
-    <div class="container">
-        <div class="left-panel">
-            <div id="canvas-container" style="position:relative; width:100%;">
-                <canvas id="mesh-canvas" width="900" height="900"></canvas>
-                <div id="message"></div>
-            </div>
-        </div>
-        <div class="right-panel">
-            <div class="group" id="file-group">
-                <div class="group-title">File Operations</div>
-                <div class="group-content">
-                    <div id="file-name" style="font-size:0.9em; color:#555; min-height:1.2em; text-align:center; background:#f0f0f0; padding:8px; border-radius:6px;">No file chosen</div>
-                    <button class="modern-btn" id="load-mesh-btn" onclick="triggerFileInput()">Load Mesh</button>
-                    <input type="file" id="mesh-file" accept=".csv,.json,.inp,.deck" style="display:none;">
-                    <button class="modern-btn" id="show-mesh-btn" onclick="showMesh()">Show Mesh</button>
-                    <button class="modern-btn" id="clear-mesh-btn" onclick="clearMesh()">Clear Mesh</button>
-                </div>
-            </div>
-            <div class="group" id="ops-group">
-                <div class="group-title">Mesh Tools</div>
-                <div class="group-content">
-                    <button class="modern-btn" onclick="addNode()">Add Node</button>
-                    <button class="modern-btn" onclick="exportMatrix()">Export Matrix</button>
-                    <div class="checkbox-container">
-                        <input type="checkbox" id="show-labels-checkbox" checked>
-                        <label for="show-labels-checkbox">Show Node Labels</label>
+<body class="font-sans overflow-hidden">
+    <div id="app-container" class="w-screen h-screen flex flex-col p-4 gap-4">
+        <header id="main-header" class="bg-[#00274C] text-white shadow-md z-10 rounded-lg flex-shrink-0">
+            <nav class="px-4 py-2 flex justify-between items-center">
+                <div class="flex items-center gap-8">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 3H21V21H3V3Z" stroke="white" stroke-width="2"/>
+                            <path d="M3 8H21" stroke="white" stroke-width="2"/>
+                            <path d="M8 3V21" stroke="white" stroke-width="2"/>
+                        </svg>
+                        <h1 class="text-xl font-bold">2D Mesh Editor</h1>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <!-- File Menu -->
+                        <div class="relative" data-menu>
+                            <button class="menu-button hover:bg-[#001F3F] px-3 py-2 rounded-md">File</button>
+                            <div class="menu-dropdown absolute left-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg py-1 hidden">
+                                <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50" onclick="triggerFileInput()">Import Mesh</a>
+                                <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50" onclick="exportMatrix()">Export Matrix</a>
+                                <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50" onclick="clearMesh()">Clear Mesh</a>
+                            </div>
+                        </div>
+                        <!-- Edit Menu -->
+                        <div class="relative" data-menu>
+                            <button class="menu-button hover:bg-[#001F3F] px-3 py-2 rounded-md">Edit</button>
+                            <div class="menu-dropdown absolute left-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg py-1 hidden">
+                                <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50" onclick="addNode()">Add Node</a>
+                                <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50" onclick="deleteSelected()">Remove Node</a>
+                                <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50" onclick="addConnection()">Add Connection</a>
+                                <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50" onclick="removeConnection()">Remove Connection</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="group" id="summary-group">
-                <div class="group-title">Mesh Summary</div>
-                <div id="summary">No mesh loaded</div>
-            </div>
-        </div>
+                <div class="text-xs text-blue-200">
+                    <div>Author: Eric Zhang</div>
+                    <div>Rev: V0</div>
+                    <div id="date"></div>
+                </div>
+            </nav>
+        </header>
+        <main id="main-content" class="flex-grow relative border-2 border-gray-300 rounded-lg bg-white">
+            <canvas id="mesh-canvas" class="w-full h-full"></canvas>
+            <div id="message" class="absolute bottom-4 left-4 right-4 bg-[#00274C] bg-opacity-75 text-white text-center p-2 rounded-md opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <div id="summary" class="absolute top-4 right-4 bg-white p-2 rounded-md shadow-md text-gray-700">No mesh loaded</div>
+        </main>
     </div>
-    <script src="/static/main.js"></script>
+    <div id="context-menu" class="absolute bg-white text-gray-800 rounded-md shadow-lg py-1 hidden w-56">
+        <div class="px-4 py-2">
+            <input type="checkbox" id="show-node-labels-checkbox" class="h-4 w-4 text-[#FFCB05] border-gray-300 rounded focus:ring-[#FFCB05]">
+            <label for="show-node-labels-checkbox" class="ml-2 text-sm text-gray-900">Node Labels</label>
+        </div>
+        <div class="px-4 py-2">
+            <input type="checkbox" id="show-element-labels-checkbox" class="h-4 w-4 text-[#FFCB05] border-gray-300 rounded focus:ring-[#FFCB05]">
+            <label for="show-element-labels-checkbox" class="ml-2 text-sm text-gray-900">Element Labels</label>
+        </div>
+        <div class="border-t border-gray-200 my-1"></div>
+        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50" onclick="centerAndDrawMesh(mesh)">Center View</a>
+    </div>
+    <input type="file" id="mesh-file" accept=".csv,.json,.inp,.deck" class="hidden">
+
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/spatial-hash-grid.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/canvas.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script>
+        document.getElementById('date').textContent = `Date: ${new Date().toLocaleDateString()}`;
+        const header = document.getElementById('main-header');
+        const mainContent = document.getElementById('main-content');
+        const appContainer = document.getElementById('app-container');
+        const setMainContentHeight = () => {
+            const headerHeight = header.offsetHeight;
+            const appContainerPadding = parseInt(window.getComputedStyle(appContainer).paddingTop) + parseInt(window.getComputedStyle(appContainer).paddingBottom);
+            mainContent.style.height = `calc(100vh - ${headerHeight}px - ${appContainerPadding}px - 1rem)`;
+        };
+        window.addEventListener('resize', setMainContentHeight);
+        setMainContentHeight();
+    </script>
 </body>
 </html>

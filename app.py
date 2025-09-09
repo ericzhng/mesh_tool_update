@@ -12,6 +12,7 @@ socketio = SocketIO(app)
 mesh = {
     "nodes": [],  # [{'id': int, 'x': float, 'y': float}]
     "connections": [],  # [{'source': int, 'target': int}]
+    "elements": [], # [{'id': int, 'node_ids': list}]
 }
 
 UPLOAD_FOLDER = "data"
@@ -32,6 +33,7 @@ def get_mesh_summary():
     return {
         "num_nodes": len(mesh["nodes"]),
         "num_connections": len(mesh["connections"]),
+        "num_elements": len(mesh["elements"]),
     }
 
 
@@ -57,6 +59,7 @@ def load_mesh():
             mesh_data = abaqusIO.read_mesh(filepath)
             mesh["nodes"] = mesh_data["nodes"]
             mesh["connections"] = mesh_data["connections"]
+            mesh["elements"] = mesh_data["elements"]
             last_uploaded_file["path"] = filepath  # remember last file
         except Exception as e:
             return f"Failed to parse mesh: {e}", 400
@@ -77,6 +80,7 @@ def last_mesh():
             mesh_data = abaqusIO.read_mesh(last_uploaded_file["path"])
             mesh["nodes"] = mesh_data["nodes"]
             mesh["connections"] = mesh_data["connections"]
+            mesh["elements"] = mesh_data["elements"]
         except Exception:
             pass
     return jsonify(mesh)
@@ -150,6 +154,7 @@ def handle_clear_mesh():
     """Handles a request to clear the mesh."""
     mesh["nodes"] = []
     mesh["connections"] = []
+    mesh["elements"] = []
     emit("mesh_data", mesh, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 

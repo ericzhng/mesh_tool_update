@@ -12,10 +12,12 @@ def read_abaqus_inp(filepath):
         filepath (str): The path to the .inp file.
 
     Returns:
-        dict: A dictionary containing the mesh nodes and connections.
+        dict: A dictionary containing the mesh nodes, connections (edges), and elements.
     """
     nodes = []
-    connections = []
+    elements = [] # New list for 2D elements
+    connections = [] # This will store edges derived from elements, and explicit 1D connections
+
     with open(filepath, "r") as f:
         lines = f.readlines()
     node_section = False
@@ -43,22 +45,21 @@ def read_abaqus_inp(filepath):
         if elem_section and line:
             parts = re.split(r"[ ,]+", line)
             if len(parts) >= 3:
-                # For 2-node elements (lines), add as connection
-                if len(parts) == 3:
-                    connections.append(
-                        {"source": int(parts[1]), "target": int(parts[2])}
-                    )
-                # For 3+ node elements (triangles, quads), add as edges between consecutive nodes
-                else:
-                    node_ids = [int(pid) for pid in parts[1:] if pid]
-                    for i in range(len(node_ids)):
-                        connections.append(
-                            {
-                                "source": node_ids[i],
-                                "target": node_ids[(i + 1) % len(node_ids)],
-                            }
-                        )
-    return {"nodes": nodes, "connections": connections}
+                element_id = int(parts[0])
+                node_ids = [int(pid) for pid in parts[1:] if pid]
+
+                # Store the element as a single entity
+                elements.append({"id": element_id, "node_ids": node_ids})
+
+                # Generate connections (edges) from the element for drawing
+                for i in range(len(node_ids)):
+                    source_node = node_ids[i]
+                    target_node = node_ids[(i + 1) % len(node_ids)]
+                    # Add connection only if it's not a duplicate (for 2D elements)
+                    # A more robust solution might involve sorting (min, max) for the pair
+                    if {"source": target_node, "target": source_node} not in connections:
+                        connections.append({"source": source_node, "target": target_node})
+    return {"nodes": nodes, "connections": connections, "elements": elements}
 
 
 def read_csv(filepath):
