@@ -108,3 +108,11 @@ window.addEventListener('click', e => {
         hideContextMenu();
     }
 });
+
+document.getElementById('rotate-cw').addEventListener('click', () => {
+    rotateView(Math.PI / 2);
+});
+
+document.getElementById('rotate-ccw').addEventListener('click', () => {
+    rotateView(-Math.PI / 2);
+});

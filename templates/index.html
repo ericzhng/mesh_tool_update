@@ -52,7 +52,21 @@
         <main id="main-content" class="flex-grow relative border-2 border-gray-300 rounded-lg bg-white">
             <canvas id="mesh-canvas" class="w-full h-full"></canvas>
             <div id="message" class="absolute bottom-4 left-4 right-4 bg-[#00274C] bg-opacity-75 text-white text-center p-2 rounded-md opacity-0 transition-opacity duration-300 pointer-events-none"></div>
-            <div id="summary" class="absolute top-4 right-4 bg-white p-2 rounded-md shadow-md text-gray-700">No mesh loaded</div>
+            <div class="absolute top-4 right-4 flex items-center gap-2">
+                <div id="rotate-buttons" class="flex flex-row gap-2">
+                    <button id="rotate-ccw" class="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100">
+                        <svg class="w-6 h-6 text-gray-700" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8.45 5.55L13 1v3.07c3.94.49 7 3.85 7 7.93s-3.06 7.44-7 7.93v-2.02c2.83-.48 5-2.94 5-5.91s-2.17-5.43-5-5.91V11L8.45 5.55z"/>
+                        </svg>
+                    </button>
+                    <button id="rotate-cw" class="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100">
+                        <svg class="w-6 h-6 text-gray-700" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.06 7.44 7 7.93v-2.02c-2.83-.48-5-2.94-5-5.91s2.17-5.43 5-5.91V11l4.55-5.45z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="summary" class="bg-white p-2 rounded-md shadow-md text-gray-700">No mesh loaded</div>
+            </div>
         </main>
     </div>
     <div id="context-menu" class="absolute bg-white text-gray-800 rounded-md shadow-lg py-1 hidden w-56">

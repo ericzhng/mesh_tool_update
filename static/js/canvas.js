@@ -58,6 +58,21 @@ function getCentroid(node_ids) {
     return { x: centerX / numNodes, y: centerY / numNodes };
 }
 
+function rotateView(angle) {
+    const rect = canvas.getBoundingClientRect();
+    const centerScreen = { x: rect.width / 2, y: rect.height / 2 };
+    const centerWorldOld = toWorld(centerScreen.x, centerScreen.y);
+
+    view.rotation += angle;
+
+    const centerWorldNewScreen = toScreen(centerWorldOld.x, centerWorldOld.y);
+    
+    view.offsetX += centerScreen.x - centerWorldNewScreen.x;
+    view.offsetY += centerScreen.y - centerWorldNewScreen.y;
+
+    scheduleDrawMesh();
+}
+
 function drawMesh() {
     const rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
