@@ -200,7 +200,8 @@
             // Set fill style based on selection
             if (selectedNodes.includes(n)) {
                 ctx.fillStyle = selectedNodes.length === 1 ? '#00FF00' : '#00FFFF'; // Lime green for single, Cyan for multiple
-            } else {
+            }
+            else {
                 ctx.fillStyle = 'rgba(0, 39, 76, 0.4)'; // Default color
             }
             ctx.fill();
@@ -248,14 +249,21 @@
         const meshWidth = maxX - minX;
         const meshHeight = maxY - minY;
 
+        let calculatedScale;
         if (meshWidth === 0 || meshHeight === 0) {
-            view.scale = 1;
+            calculatedScale = 1; // Default scale if mesh has no extent
         }
         else {
             const scaleX = rect.width / meshWidth;
             const scaleY = rect.height / meshHeight;
-            view.scale = Math.min(scaleX, scaleY) * 0.9;
+            calculatedScale = Math.min(scaleX, scaleY) * 0.9; // Fit with padding
         }
+
+        // Introduce limits for the initial calculated scale to prevent extreme values
+        const minAllowedInitialScale = 0.1; // Example: Don't go below 0.1 pixels per unit
+        const maxAllowedInitialScale = 100; // Example: Don't go above 100 pixels per unit
+
+        view.scale = Math.max(minAllowedInitialScale, Math.min(calculatedScale, maxAllowedInitialScale));
 
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
@@ -354,6 +362,7 @@
             view.offsetX += e.movementX;
             view.offsetY += e.movementY;
             viewChanged = true;
+            console.log("Current view.scale:", view.scale);
         }
         else if (isRotating) {
             const dx = e.clientX - panStart.x;
