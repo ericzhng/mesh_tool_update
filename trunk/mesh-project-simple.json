@@ -1,0 +1,76 @@
+{
+  "mesh": {
+    "nodes": [
+      {
+        "id": 1,
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": 2,
+        "x": 1,
+        "y": 0
+      },
+      {
+        "id": 3,
+        "x": 1,
+        "y": 1
+      },
+      {
+        "id": 4,
+        "x": 0,
+        "y": 1
+      }
+    ],
+    "connections": [
+      {
+        "source": 1,
+        "target": 2
+      },
+      {
+        "source": 2,
+        "target": 3
+      },
+      {
+        "source": 3,
+        "target": 1
+      },
+      {
+        "source": 3,
+        "target": 4
+      },
+      {
+        "source": 4,
+        "target": 1
+      }
+    ],
+    "elements": [
+      {
+        "id": 1,
+        "node_ids": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "id": 2,
+        "node_ids": [
+          1,
+          3,
+          4
+        ]
+      }
+    ]
+  },
+  "view": {
+    "offsetX": 580.65,
+    "offsetY": 40.14999999999998,
+    "scale": 722.7,
+    "rotation": 0
+  },
+  "appState": {
+    "meshLoaded": true,
+    "meshDisplayed": true
+  }
+}

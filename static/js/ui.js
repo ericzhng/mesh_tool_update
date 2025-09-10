@@ -60,3 +60,70 @@ function hideContextMenu() {
     const contextMenu = document.getElementById('context-menu');
     contextMenu.classList.add('hidden');
 }
+
+async function saveProject() {
+    const state = historyManager.getCurrentState();
+    const dataStr = JSON.stringify(state, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+
+    if (window.showSaveFilePicker) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: 'mesh-project.json',
+                types: [{
+                    description: 'JSON Files',
+                    accept: { 'application/json': ['.json'] },
+                }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            showMessage('Project saved', 'success');
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error(err.name, err.message);
+                showMessage('Error saving file', 'error');
+            }
+        }
+    } else {
+        // Fallback for older browsers
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'mesh-project.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showMessage('Project saved', 'success');
+    }
+}
+
+function openProject() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    const state = JSON.parse(e.target.result);
+                    if (state.mesh && state.view && state.appState) {
+                        historyManager.history = [state];
+                        historyManager.pointer = 0;
+                        historyManager.applyState();
+                        showMessage('Project loaded', 'success');
+                    } else {
+                        showMessage('Invalid project file', 'error');
+                    }
+                } catch (error) {
+                    showMessage('Failed to parse project file', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+    };
+    input.click();
+}

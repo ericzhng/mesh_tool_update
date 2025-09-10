@@ -45,6 +45,11 @@ socket.on('mesh_data', data => {
 
     scheduleDrawMesh();
     updateSummary(); // Removed argument
+
+    // Push state to history
+    if (historyManager) {
+        historyManager.pushState();
+    }
 });
 
 socket.on('mesh_summary', updateSummary);
@@ -53,11 +58,69 @@ socket.on('mesh_summary', updateSummary);
 
 window.addEventListener('DOMContentLoaded', () => {
     resizeCanvas();
-    fetch('/last_mesh').then(r => r.json()).then(data => {
-        if (data.nodes && data.nodes.length) {
-            appState.meshLoaded = true;
+
+    const state = {
+        get mesh() { return mesh; },
+        set mesh(value) { mesh = value; },
+        get view() { return view; },
+        set view(value) { view = value; },
+        get appState() { return appState; },
+        set appState(value) { appState = value; },
+    };
+
+    const callbacks = {
+        onStateApplied: () => {
+            // Rebuild nodesMap and spatialGrid
+            nodesMap = new Map(mesh.nodes.map(n => [n.id, n]));
+            if (mesh.nodes.length > 0) {
+                const bounds = { min: [Infinity, Infinity], max: [-Infinity, -Infinity] };
+                for (const node of mesh.nodes) {
+                    bounds.min[0] = Math.min(bounds.min[0], node.x);
+                    bounds.min[1] = Math.min(bounds.min[1], node.y);
+                    bounds.max[0] = Math.max(bounds.max[0], node.x);
+                    bounds.max[1] = Math.max(bounds.max[1], node.y);
+                }
+                const range = Math.max(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1]);
+                const cellSize = range / Math.max(1, Math.sqrt(mesh.nodes.length) / 4);
+                spatialGrid = new SpatialHashGrid(bounds, [cellSize, cellSize]);
+                mesh.nodes.forEach(node => spatialGrid.insert(node));
+            } else {
+                spatialGrid = null;
+            }
+            scheduleDrawMesh();
+            updateSummary();
         }
-    });
+    };
+
+    historyManager = new HistoryManager(state, callbacks);
+
+    if (!historyManager.loadFromLocalStorage()) {
+        fetch('/last_mesh').then(r => r.json()).then(data => {
+            if (data.nodes && data.nodes.length) {
+                mesh.nodes = data.nodes;
+                mesh.connections = data.connections || [];
+                mesh.elements = data.elements || [];
+                nodesMap = new Map(mesh.nodes.map(n => [n.id, n]));
+                const bounds = { min: [Infinity, Infinity], max: [-Infinity, -Infinity] };
+                for (const node of mesh.nodes) {
+                    bounds.min[0] = Math.min(bounds.min[0], node.x);
+                    bounds.min[1] = Math.min(bounds.min[1], node.y);
+                    bounds.max[0] = Math.max(bounds.max[0], node.x);
+                    bounds.max[1] = Math.max(bounds.max[1], node.y);
+                }
+                const range = Math.max(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1]);
+                const cellSize = range / Math.max(1, Math.sqrt(mesh.nodes.length) / 4);
+                spatialGrid = new SpatialHashGrid(bounds, [cellSize, cellSize]);
+                mesh.nodes.forEach(node => spatialGrid.insert(node));
+
+                appState.meshLoaded = true;
+                appState.meshDisplayed = true;
+                centerAndDrawMesh(mesh);
+                updateSummary();
+                historyManager.pushState();
+            }
+        });
+    }
 });
 
 // --- MESH OPERATIONS ---
