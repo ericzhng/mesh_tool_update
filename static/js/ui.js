@@ -61,7 +61,105 @@ function hideContextMenu() {
     contextMenu.classList.add('hidden');
 }
 
-async function saveProject() {
+function newProject() {
+    projectFileHandle = null;
+    mesh = { nodes: [], connections: [], elements: [] };
+    nodesMap = new Map();
+    spatialGrid = null;
+    appState = {
+        meshLoaded: false,
+        meshDisplayed: false,
+    };
+    view = { offsetX: 0, offsetY: 0, scale: 1, rotation: 0 };
+    if (historyManager) {
+        historyManager.history = [];
+        historyManager.pointer = -1;
+        historyManager.pushState();
+    }
+    scheduleDrawMesh();
+    updateSummary();
+    showMessage('New project started', 'success');
+}
+
+async function openProject() {
+    if (window.showOpenFilePicker) {
+        try {
+            const [handle] = await window.showOpenFilePicker({
+                types: [{
+                    description: 'JSON Files',
+                    accept: { 'application/json': ['.json'] },
+                }],
+            });
+            projectFileHandle = handle;
+            const file = await handle.getFile();
+            const contents = await file.text();
+            const state = JSON.parse(contents);
+            if (state.mesh && state.view && state.appState) {
+                historyManager.history = [state];
+                historyManager.pointer = 0;
+                historyManager.applyState();
+                showMessage('Project loaded', 'success');
+            } else {
+                showMessage('Invalid project file', 'error');
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error(err.name, err.message);
+                showMessage('Error opening file', 'error');
+            }
+        }
+    } else {
+        // Fallback for older browsers
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        const state = JSON.parse(e.target.result);
+                        if (state.mesh && state.view && state.appState) {
+                            historyManager.history = [state];
+                            historyManager.pointer = 0;
+                            historyManager.applyState();
+                            showMessage('Project loaded', 'success');
+                            projectFileHandle = null;
+                        } else {
+                            showMessage('Invalid project file', 'error');
+                        }
+                    } catch (error) {
+                        showMessage('Failed to parse project file', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        };
+        input.click();
+    }
+}
+
+async function save() {
+    if (projectFileHandle) {
+        const state = historyManager.getCurrentState();
+        const dataStr = JSON.stringify(state, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        try {
+            const writable = await projectFileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            showMessage('Project saved', 'success');
+        } catch (err) {
+            console.error(err.name, err.message);
+            showMessage('Error saving file', 'error');
+        }
+    } else {
+        saveAs();
+    }
+}
+
+async function saveAs() {
     const state = historyManager.getCurrentState();
     const dataStr = JSON.stringify(state, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
@@ -75,6 +173,7 @@ async function saveProject() {
                     accept: { 'application/json': ['.json'] },
                 }],
             });
+            projectFileHandle = handle;
             const writable = await handle.createWritable();
             await writable.write(blob);
             await writable.close();
@@ -97,33 +196,4 @@ async function saveProject() {
         URL.revokeObjectURL(url);
         showMessage('Project saved', 'success');
     }
-}
-
-function openProject() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = e => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                try {
-                    const state = JSON.parse(e.target.result);
-                    if (state.mesh && state.view && state.appState) {
-                        historyManager.history = [state];
-                        historyManager.pointer = 0;
-                        historyManager.applyState();
-                        showMessage('Project loaded', 'success');
-                    } else {
-                        showMessage('Invalid project file', 'error');
-                    }
-                } catch (error) {
-                    showMessage('Failed to parse project file', 'error');
-                }
-            };
-            reader.readAsText(file);
-        }
-    };
-    input.click();
 }

@@ -25,6 +25,7 @@ let zoomStart = { y: 0, scale: 1, mouseX: 0, mouseY: 0 };
 let isSelecting = false;
 let selectStart = null;
 let selectRect = null;
+let projectFileHandle = null;
 
 class HistoryManager {
     constructor(state, callbacks) {
