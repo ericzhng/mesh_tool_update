@@ -69,6 +69,10 @@
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10V6a3 3 0 00-3-3H9.75a3 3 0 00-3 3v4m8 0l3 3m0 0l3-3m-3 3V4.5" /></svg>
                                     Redo
                                 </a>
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Reloading page...', () => reloadPage())">
+                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004 16.001V12H2.55L9 1.25 15.45 12H14v4.001c0 3.981-3.006 7.228-6.938 7.931l-.742.082m13.616-1.452a8.001 8.001 0 00-15.356-2H4" /></svg>
+                                    Refresh
+                                </a>
                                 <div class="border-t border-gray-200 my-1"></div>
                                 <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Adding node', () => addNode())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -133,6 +137,13 @@
                 <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
             </svg>
             Home View
+        </a>
+        <div class="border-t border-gray-200 my-1"></div>
+        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Reloading page...', () => reloadPage())">
+            <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Refresh
         </a>
     </div>
     <input type="file" id="mesh-file" accept=".csv,.json,.inp,.deck" class="hidden">

@@ -114,6 +114,11 @@ function newProject() {
 }
 window.newProject = newProject;
 
+function reloadPage() {
+    window.location.reload();
+}
+window.reloadPage = reloadPage;
+
 async function openProject() {
     if (window.showOpenFilePicker) {
         try {
