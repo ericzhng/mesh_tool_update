@@ -185,7 +185,7 @@
             if (selectedNodes.includes(n)) {
                 ctx.fillStyle = selectedNodes.length === 1 ? '#00FF00' : '#00FFFF'; // Lime green for single, Cyan for multiple
             } else {
-                ctx.fillStyle = '#00274C'; // Default color
+                ctx.fillStyle = 'rgba(0, 39, 76, 0.4)'; // Default color
             }
             ctx.fill();
 
