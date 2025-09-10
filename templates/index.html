@@ -97,14 +97,12 @@
                 </div>
             </nav>
         </header>
-        <main id="main-content" class="flex-grow relative border-2 border-gray-300 rounded-lg bg-white">
-            <canvas id="mesh-canvas" class="w-full h-full"></canvas>
-            <div id="bottom-status-bar" class="absolute bottom-4 left-4 right-4 flex justify-between items-end gap-4">
+            <main id="main-content" class="relative flex-grow flex flex-col border-2 border-gray-300 rounded-lg bg-white">
+            <canvas id="mesh-canvas" class="w-full h-full flex-grow"></canvas>
+            <div id="bottom-status-bar" class="absolute bottom-0 left-0 right-0 p-4 flex justify-between items-end gap-4 z-10">
                 <div id="summary" class="bg-white p-2 rounded-md shadow-md text-gray-700 text-sm flex-shrink-0">No mesh loaded</div>
                 <div id="status-message" class="bg-[#00274C] bg-opacity-75 text-white text-center p-2 rounded-md opacity-0 transition-opacity duration-300 pointer-events-none flex-grow"></div>
             </div>
-            
-            
         </main>
     </div>
     <div id="context-menu" class="absolute bg-white text-gray-800 rounded-md shadow-lg py-1 hidden w-56">
@@ -157,7 +155,7 @@
             mainContent.style.height = `calc(100vh - ${headerHeight}px - ${appContainerPadding}px - 1rem)`;
         };
         window.addEventListener('resize', setMainContentHeight);
-        setMainContentHeight();
+        setMainContentHeight();        
     </script>
 </body>
 </html>

@@ -84,13 +84,13 @@ h1 {
 
 #mesh-canvas {
     width: 100%;
-    height: auto;
-    aspect-ratio: 1 / 1;
+    height: 100%; /* Changed from auto */
     border: 1px solid var(--gray-light);
     background: linear-gradient(135deg, var(--primary-light) 0%, var(--white) 100%);
     border-radius: 12px;
     box-sizing: border-box;
     cursor: crosshair;
+    min-height: 0; /* Added to allow shrinking */
 }
 
 #summary {

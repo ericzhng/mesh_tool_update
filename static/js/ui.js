@@ -32,11 +32,6 @@ function showMessage(msg, type = 'info', duration = 3000) {
         messageDiv.classList.add('bg-gray-800', 'bg-opacity-75');
     }
     messageDiv.classList.add('opacity-100');
-    setTimeout(() => { 
-        messageDiv.classList.remove('opacity-100');
-        messageDiv.classList.add('opacity-0');
-        messageDiv.classList.add('pointer-events-none');
-    }, duration);
 }
 
 function updateSummary(summary) {
