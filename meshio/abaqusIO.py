@@ -151,3 +151,23 @@ def read_mesh(filepath):
         return read_json(filepath)
     else:
         raise ValueError(f"Unsupported mesh file format: {ext}")
+
+def write_abaqus_inp(filepath, mesh_data):
+    """
+    Writes mesh data to an Abaqus input file (.inp).
+
+    Args:
+        filepath (str): The path to the .inp file.
+        mesh_data (dict): A dictionary containing the mesh nodes and elements.
+                          Expected keys: "nodes", "elements".
+    """
+    with open(filepath, "w") as f:
+        f.write("*NODE\n")
+        for node in mesh_data["nodes"]:
+            f.write(f"{node['id']}, {node['x']:.6f}, {node['y']:.6f}\n")
+
+        if mesh_data["elements"]:
+            f.write("*ELEMENT, TYPE=S2\n") # Assuming S2 for 2-node elements, adjust as needed
+            for elem in mesh_data["elements"]:
+                node_ids_str = ", ".join(map(str, elem["node_ids"]))
+                f.write(f"{elem['id']}, {node_ids_str}\n")

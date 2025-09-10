@@ -66,3 +66,8 @@ function exportMatrix() {
     });
 }
 window.exportMatrix = exportMatrix;
+
+function sendBulkNodeUpdate(nodesData, isDragging = false) {
+    socket.emit('update_nodes_bulk', { nodes: nodesData, isDragging: isDragging });
+}
+window.sendBulkNodeUpdate = sendBulkNodeUpdate;

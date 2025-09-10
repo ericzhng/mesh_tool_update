@@ -126,7 +126,47 @@ def handle_update_node(data):
             n["y"] = data["y"]
     is_dragging = data.get("isDragging", False)
     dragging_node_id = data.get("draggingNodeId")
-    emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id}, broadcast=True)
+
+    # Save the mesh after single node update
+    if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
+        file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
+        if file_ext == ".inp" or file_ext == ".deck":
+            try:
+                abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
+            except Exception as e:
+                print(f"Error saving mesh after single node update: {e}")
+
+    if not is_dragging: # Only emit mesh_data if not currently dragging
+        emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id}, broadcast=True)
+    emit("mesh_summary", get_mesh_summary(), broadcast=True)
+
+
+@socketio.on("update_nodes_bulk")
+def handle_update_nodes_bulk(data):
+    """Handles a request to update multiple nodes in the mesh."""
+    updated_nodes_data = data.get("nodes", [])
+    is_dragging = data.get("isDragging", False)
+
+    # Create a dictionary for quick lookup of nodes by ID
+    nodes_to_update_map = {node_data["id"]: node_data for node_data in updated_nodes_data}
+
+    for n in mesh["nodes"]:
+        if n["id"] in nodes_to_update_map:
+            updated_data = nodes_to_update_map[n["id"]]
+            n["x"] = updated_data["x"]
+            n["y"] = updated_data["y"]
+    
+    # Save the mesh after bulk update
+    if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
+        file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
+        if file_ext == ".inp" or file_ext == ".deck":
+            try:
+                abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
+            except Exception as e:
+                print(f"Error saving mesh after bulk update: {e}")
+
+    if not is_dragging: # Only emit mesh_data if not currently dragging
+        emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 

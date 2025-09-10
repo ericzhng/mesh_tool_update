@@ -8,6 +8,7 @@
     let selectedNodes = [];
     let draggingNode = null;
     let dragOffset = { x: 0, y: 0 };
+    let isDraggingGroup = false; // New flag for group dragging
     let isSelecting = false;
     let selectStart = { x: 0, y: 0 };
     let selectRect = null;
@@ -320,6 +321,8 @@
             isShiftSelecting = e.shiftKey;
 
             if (clickedNode) {
+                const isNodeAlreadySelected = selectedNodes.includes(clickedNode);
+
                 if (isCtrlSelecting) { // Ctrl/Cmd click to toggle selection
                     const index = selectedNodes.indexOf(clickedNode);
                     if (index > -1) {
@@ -328,15 +331,29 @@
                         selectedNodes.push(clickedNode); // Add if not selected
                     }
                 } else if (isShiftSelecting) { // Shift click to add to selection
-                    // For now, just add. Range selection is more complex. This will be handled in mouseup for rect select.
-                    if (!selectedNodes.includes(clickedNode)) {
+                    if (!isNodeAlreadySelected) {
                         selectedNodes.push(clickedNode);
                     }
-                } else { // Single click to select only this node
-                    selectedNodes = [clickedNode];
+                } else { // No modifier key
+                    if (!isNodeAlreadySelected) { // If clicked node is not selected, clear selection and select it
+                        selectedNodes = [clickedNode];
+                    }
+                    // If clicked node is already selected, we assume the user wants to drag the group
+                    // No change to selectedNodes, proceed to dragging logic
                 }
-                draggingNode = clickedNode; // Allow dragging of the clicked node
-                dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
+
+                if (selectedNodes.includes(clickedNode)) { // If the clicked node is now part of the selection (either single or group)
+                    draggingNode = clickedNode; // The node that initiated the drag
+                    dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
+                    if (selectedNodes.length > 1 && isNodeAlreadySelected && !isCtrlSelecting && !isShiftSelecting) {
+                        isDraggingGroup = true; // Flag for group drag
+                    } else {
+                        isDraggingGroup = false; // Single node drag
+                    }
+                } else { // Clicked node was deselected by Ctrl/Cmd click, no drag
+                    draggingNode = null;
+                    isDraggingGroup = false;
+                }
             } else { // Clicked on empty space, start rect select
                 if (!isCtrlSelecting && !isShiftSelecting) {
                     selectedNodes = []; // Clear selection on empty click if no modifier
@@ -372,10 +389,25 @@
         }
         else if (draggingNode) {
             const worldPos = toWorld(pos.x, pos.y);
-            const newX = worldPos.x + dragOffset.x;
-            const newY = worldPos.y + dragOffset.y;
-            window.updateNodePosition(draggingNode.id, newX, newY);
-            socket.emit('update_node', { id: draggingNode.id, x: newX, y: newY, isDragging: true, draggingNodeId: draggingNode.id });
+            const deltaX = (worldPos.x + dragOffset.x) - draggingNode.x;
+            const deltaY = (worldPos.y + dragOffset.y) - draggingNode.y;
+
+            if (isDraggingGroup) {
+                const updatedNodes = [];
+                selectedNodes.forEach(node => {
+                    const newX = node.x + deltaX;
+                    const newY = node.y + deltaY;
+                    window.updateNodePosition(node.id, newX, newY); // Update local state
+                    updatedNodes.push({ id: node.id, x: newX, y: newY });
+                });
+                // Send bulk update to server using the new API function
+                window.sendBulkNodeUpdate(updatedNodes, true);
+            } else {
+                const newX = worldPos.x + dragOffset.x;
+                const newY = worldPos.y + dragOffset.y;
+                window.updateNodePosition(draggingNode.id, newX, newY);
+                socket.emit('update_node', { id: draggingNode.id, x: newX, y: newY, isDragging: true, draggingNodeId: draggingNode.id });
+            }
             hasDragged = true;
         }
         else if (isSelecting) {
@@ -441,6 +473,7 @@
         isPanning = false;
         isRotating = false;
         isSelecting = false;
+        isDraggingGroup = false; // Reset group dragging flag
         selectRect = null;
         canvas.style.cursor = 'crosshair';
 
@@ -450,6 +483,9 @@
 
         if (e.button === 2) { // Right click released
             showContextMenu(e);
+        } else if (draggingNode || isDraggingGroup) { // If a drag operation just finished
+            // Request the latest mesh data from the server to ensure sync
+            socket.emit('get_mesh');
         }
         scheduleDrawMesh();
     });
