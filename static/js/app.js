@@ -7,12 +7,32 @@ let isDeleting = false;
 socket.on('mesh_data', data => {
     const meshData = data.mesh || data;
     const isDragging = data.isDragging || false;
+    const draggingNodeId = data.draggingNodeId || null;
 
     // console.log('Received meshData:', meshData); // Added for debugging
 
-    mesh.nodes = meshData.nodes || [];
-    mesh.connections = meshData.connections || [];
-    mesh.elements = meshData.elements || [];
+    if (isDragging && draggingNodeId !== null) {
+        // During dragging, only update nodes that are NOT the dragging node
+        // The dragging node's position is already updated locally by window.updateNodePosition
+        const updatedNodesMap = new Map(meshData.nodes.map(n => [n.id, n]));
+        for (const localNode of mesh.nodes) {
+            if (localNode.id !== draggingNodeId) {
+                const serverNode = updatedNodesMap.get(localNode.id);
+                if (serverNode) {
+                    localNode.x = serverNode.x;
+                    localNode.y = serverNode.y;
+                }
+            }
+        }
+        // Also update connections and elements as they are not affected by local drag
+        mesh.connections = meshData.connections || [];
+        mesh.elements = meshData.elements || [];
+    } else {
+        // If not dragging, or no specific dragging node, update all mesh data normally
+        mesh.nodes = meshData.nodes || [];
+        mesh.connections = meshData.connections || [];
+        mesh.elements = meshData.elements || [];
+    }
     
     nodesMap = new Map(mesh.nodes.map(n => [n.id, n]));
 
@@ -48,11 +68,6 @@ socket.on('mesh_data', data => {
 
     scheduleDrawMesh();
     updateSummary(); // Removed argument
-
-    // Push state to history
-    if (historyManager) {
-        historyManager.pushState();
-    }
 });
 
 socket.on('mesh_summary', updateSummary);

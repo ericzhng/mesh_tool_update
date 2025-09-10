@@ -13,10 +13,6 @@ const lod = {
     labelThreshold: 12, // view.scale threshold to draw labels
 };
 
-let selectedNode = null;
-let draggingNode = null;
-let isDraggingNode = false;
-let dragOffset = { x: 0, y: 0 };
 let isPanning = false;
 let isZooming = false;
 let panStart = { x: 0, y: 0 };
@@ -25,6 +21,31 @@ let isSelecting = false;
 let selectStart = null;
 let selectRect = null;
 let projectFileHandle = null;
+
+/**
+ * Updates the position of a node in the mesh and spatial grid.
+ * @param {number} nodeId - The ID of the node to update.
+ * @param {number} newX - The new X coordinate for the node.
+ * @param {number} newY - The new Y coordinate for the node.
+ */
+function updateNodePosition(nodeId, newX, newY) {
+    const node = nodesMap.get(nodeId);
+    if (node) {
+        // Remove from old position in spatial grid
+        if (spatialGrid) {
+            spatialGrid.remove(node);
+        }
+
+        node.x = newX;
+        node.y = newY;
+
+        // Insert into new position in spatial grid
+        if (spatialGrid) {
+            spatialGrid.insert(node);
+        }
+    }
+}
+window.updateNodePosition = updateNodePosition;
 
 class HistoryManager {
     constructor(state, callbacks) {

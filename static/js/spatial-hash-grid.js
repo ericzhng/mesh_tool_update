@@ -44,4 +44,15 @@ class SpatialHashGrid {
         };
         return this.query(searchBounds);
     }
+
+    remove(node) {
+        const index = this.getCellIndex(node);
+        if (this.cells.has(index)) {
+            const cellNodes = this.cells.get(index);
+            const nodeIndex = cellNodes.indexOf(node);
+            if (nodeIndex > -1) {
+                cellNodes.splice(nodeIndex, 1);
+            }
+        }
+    }
 }

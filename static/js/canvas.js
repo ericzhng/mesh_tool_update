@@ -7,12 +7,12 @@
     let panStart = { x: 0, y: 0 };
     let selectedNodes = [];
     let draggingNode = null;
-    let isDraggingNode = false;
     let dragOffset = { x: 0, y: 0 };
     let isSelecting = false;
     let selectStart = { x: 0, y: 0 };
     let selectRect = null;
     let viewChanged = false;
+    let hasDragged = false;
 
     const debouncedPushStateToHistory = debounce(window.pushStateToHistory, 250);
 
@@ -100,9 +100,8 @@
         
         view.offsetX += centerScreen.x - centerWorldNewScreen.x;
         view.offsetY += centerScreen.y - centerWorldNewScreen.y;
-
+        debouncedPushStateToHistory(); // Record rotation in history
         scheduleDrawMesh();
-        window.pushStateToHistory();
     }
 
     window.drawMesh = function() { // Expose drawMesh globally
@@ -270,9 +269,8 @@
 
         view.offsetX = rect.width / 2 - centerX * view.scale;
         view.offsetY = rect.height / 2 - centerY * view.scale;
-
+        debouncedPushStateToHistory(); // Record home view in history
         scheduleDrawMesh();
-        window.pushStateToHistory();
     }
 
     function getMousePos(e) {
@@ -288,6 +286,7 @@
 
     canvas.addEventListener('mousedown', e => {
         const pos = getMousePos(e);
+        hasDragged = false;
 
         if (e.button === 1) { // Middle mouse button
             if (e.shiftKey || e.ctrlKey) {
@@ -337,7 +336,6 @@
                     selectedNodes = [clickedNode];
                 }
                 draggingNode = clickedNode; // Allow dragging of the clicked node
-                isDraggingNode = true;
                 dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
             } else { // Clicked on empty space, start rect select
                 if (!isCtrlSelecting && !isShiftSelecting) {
@@ -362,18 +360,23 @@
             view.offsetX += e.movementX;
             view.offsetY += e.movementY;
             viewChanged = true;
-            console.log("Current view.scale:", view.scale);
+            hasDragged = true;
+            // console.log("Current view.scale:", view.scale);
         }
         else if (isRotating) {
             const dx = e.clientX - panStart.x;
             view.rotation += dx * 0.01;
             panStart = { x: e.clientX, y: e.clientY };
             viewChanged = true;
+            hasDragged = true;
         }
         else if (draggingNode) {
             const worldPos = toWorld(pos.x, pos.y);
-            const newX = worldPos.x + dragOffset.x, newY = worldPos.y + dragOffset.y;
-            socket.emit('update_node', { id: newX, y: newY, isDragging: true });
+            const newX = worldPos.x + dragOffset.x;
+            const newY = worldPos.y + dragOffset.y;
+            window.updateNodePosition(draggingNode.id, newX, newY);
+            socket.emit('update_node', { id: draggingNode.id, x: newX, y: newY, isDragging: true, draggingNodeId: draggingNode.id });
+            hasDragged = true;
         }
         else if (isSelecting) {
             selectRect = {
@@ -385,9 +388,9 @@
     }, 16));
 
     window.addEventListener('mouseup', e => {
-        if (viewChanged) {
+        if (hasDragged) {
             window.pushStateToHistory();
-            viewChanged = false;
+            hasDragged = false;
         }
         if (isSelecting && selectRect) { // Only process if a selection rectangle was drawn
             // Transform all four corners of the screen selectRect to world coordinates
@@ -435,7 +438,6 @@
             }
         }
         draggingNode = null;
-        isDraggingNode = false;
         isPanning = false;
         isRotating = false;
         isSelecting = false;
@@ -461,8 +463,8 @@
         const newScreenPos = toScreen(worldPos.x, worldPos.y);
         view.offsetX -= newScreenPos.x - pos.x;
         view.offsetY -= newScreenPos.y - pos.y;
+        debouncedPushStateToHistory(); // Record zoom in history
         scheduleDrawMesh();
-        window.pushStateToHistory();
     }, { passive: false });
 
     canvas.addEventListener('contextmenu', e => {

@@ -125,7 +125,8 @@ def handle_update_node(data):
             n["x"] = data["x"]
             n["y"] = data["y"]
     is_dragging = data.get("isDragging", False)
-    emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging}, broadcast=True)
+    dragging_node_id = data.get("draggingNodeId")
+    emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
