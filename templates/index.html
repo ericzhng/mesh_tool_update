@@ -25,33 +25,33 @@
                         <div class="relative" data-menu>
                             <button class="menu-button hover:bg-[#001F3F] px-3 py-2 rounded-md">File</button>
                             <div class="menu-dropdown absolute left-0 mt-2 w-56 bg-white text-gray-800 rounded-md shadow-lg py-1 hidden">
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="newProject()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'New project created', () => newProject())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                     New Project
                                 </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="openProject()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Opening project...', () => openProject())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                                     Open Project
                                 </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="save()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Saving project...', () => save())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                                     Save
                                 </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="saveAs()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Saving project as...', () => saveAs())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16v2a2 2 0 01-2 2H7a2 2 0 01-2-2v-2m5-11v12l-4-4m4 4l4-4" /></svg>
                                     Save As...
                                 </a>
                                 <div class="border-t border-gray-200 my-1"></div>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="triggerFileInput()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Importing mesh...', () => triggerFileInput())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                                     Import Mesh
                                 </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="exportMatrix()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Exporting matrix...', () => exportMatrix())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                     Export Matrix
                                 </a>
                                 <div class="border-t border-gray-200 my-1"></div>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="clearMesh()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Mesh cleared', () => clearMesh())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     Clear Mesh
                                 </a>
@@ -61,28 +61,28 @@
                         <div class="relative" data-menu>
                             <button class="menu-button hover:bg-[#001F3F] px-3 py-2 rounded-md">Edit</button>
                             <div class="menu-dropdown absolute left-0 mt-2 w-56 bg-white text-gray-800 rounded-md shadow-lg py-1 hidden">
-                                <a href="#" id="revert-button" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="historyManager.undo()">
+                                <a href="#" id="revert-button" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Undo action', () => historyManager.undo())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10V6a3 3 0 013-3h2.25a3 3 0 013 3v4m-8 0l-3 3m0 0l-3-3m3 3V4.5" /></svg>
                                     Undo
                                 </a>
-                                <a href="#" id="forward-button" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="historyManager.redo()">
+                                <a href="#" id="forward-button" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Redo action', () => historyManager.redo())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10V6a3 3 0 00-3-3H9.75a3 3 0 00-3 3v4m8 0l3 3m0 0l3-3m-3 3V4.5" /></svg>
                                     Redo
                                 </a>
                                 <div class="border-t border-gray-200 my-1"></div>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="addNode()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Adding node', () => addNode())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     Add Node
                                 </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="deleteSelected()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Removing selected', () => deleteSelected())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     Remove Node
                                 </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="addConnection()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Adding connection', () => addConnection())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                                     Add Connection
                                 </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="removeConnection()">
+                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Removing connection', () => removeConnection())">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     Remove Connection
                                 </a>
@@ -106,29 +106,29 @@
         </div>
     </div>
     <div id="context-menu" class="absolute bg-white text-gray-800 rounded-md shadow-lg py-1 hidden w-56">
-        <div class="px-4 py-2 context-menu-item" onclick="toggleCheckboxAndRedraw('show-node-labels-checkbox')">
+        <div class="px-4 py-2 context-menu-item" onclick="handleContextMenuItemClick(event, 'Toggling node labels', () => toggleCheckboxAndRedraw('show-node-labels-checkbox'))">
             <input type="checkbox" id="show-node-labels-checkbox" class="h-4 w-4 text-[#FFCB05] border-gray-300 rounded focus:ring-[#FFCB05] pointer-events-none">
             <label for="show-node-labels-checkbox" class="ml-2 text-sm text-gray-900 flex-grow">Node Labels</label>
         </div>
-        <div class="px-4 py-2 context-menu-item" onclick="toggleCheckboxAndRedraw('show-element-labels-checkbox')">
+        <div class="px-4 py-2 context-menu-item" onclick="handleContextMenuItemClick(event, 'Toggling element labels', () => toggleCheckboxAndRedraw('show-element-labels-checkbox'))">
             <input type="checkbox" id="show-element-labels-checkbox" class="h-4 w-4 text-[#FFCB05] border-gray-300 rounded focus:ring-[#FFCB05] pointer-events-none">
             <label for="show-element-labels-checkbox" class="ml-2 text-sm text-gray-900 flex-grow">Element Labels</label>
         </div>
         <div class="border-t border-gray-200 my-1"></div>
-        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="rotateView(Math.PI / 2)">
+        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Rotating view 90° CW', () => rotateView(Math.PI / 2))">
             <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.06 7.44 7 7.93v-2.02c-2.83-.48-5-2.94-5-5.91s2.17-5.43 5-5.91V11l4.55-5.45z"/>
             </svg>
             Rotate CW (90°)
         </a>
-        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="rotateView(-Math.PI / 2)">
+        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Rotating view 90° CCW', () => rotateView(-Math.PI / 2))">
             <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M8.45 5.55L13 1v3.07c3.94.49 7 3.85 7 7.93s-3.06 7.44-7 7.93v-2.02c2.83-.48 5-2.94 5-5.91s-2.17-5.43-5-5.91V11L8.45 5.55z"/>
             </svg>
             Rotate CCW (90°)
         </a>
         <div class="border-t border-gray-200 my-1"></div>
-        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="centerAndDrawMesh(mesh)">
+        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Resetting view', () => centerAndDrawMesh(mesh))">
             <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
             </svg>

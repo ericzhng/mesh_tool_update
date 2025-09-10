@@ -20,19 +20,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-function showMessage(msg, type = 'info', duration = 3000) {
+function showMessage(msg, type = 'info', duration = 1000) { // Default duration to 1000ms (1 second)
     const messageDiv = document.getElementById('status-message');
     messageDiv.textContent = msg;
-    messageDiv.classList.remove('bg-red-500', 'bg-green-500', 'bg-gray-800', 'opacity-0', 'pointer-events-none');
+    // Remove all type-related classes first
+    messageDiv.classList.remove('bg-red-500', 'bg-green-500', 'bg-gray-800', 'bg-[#00274C]', 'opacity-0', 'pointer-events-none');
+    
+    // Apply new type-related classes
     if (type === 'error') {
         messageDiv.classList.add('bg-red-500', 'bg-opacity-75');
     } else if (type === 'success') {
         messageDiv.classList.add('bg-green-500', 'bg-opacity-75');
-    } else {
-        messageDiv.classList.add('bg-gray-800', 'bg-opacity-75');
+    } else { // 'info' type
+        messageDiv.classList.add('bg-[#00274C]', 'bg-opacity-75'); // Use the status bar's background color
     }
-    messageDiv.classList.add('opacity-100');
+    
+    messageDiv.classList.remove('opacity-0'); // Ensure it's visible
+    messageDiv.classList.add('opacity-100'); // Make it fully opaque
+    messageDiv.classList.remove('pointer-events-none'); // Make it clickable/interactable if needed (though for messages, usually not)
+
+    // Set timeout to hide the message
+    setTimeout(() => {
+        messageDiv.classList.remove('opacity-100');
+        messageDiv.classList.add('opacity-0');
+        messageDiv.classList.add('pointer-events-none'); // Make it non-interactable when hidden
+    }, duration);
 }
+
+window.showMessage = showMessage;
 
 function updateSummary(summary) {
     const summaryDiv = document.getElementById('summary');
@@ -43,6 +58,7 @@ function updateSummary(summary) {
 function triggerFileInput() {
     document.getElementById('mesh-file').click();
 }
+window.triggerFileInput = triggerFileInput;
 
 function showContextMenu(e) {
     const contextMenu = document.getElementById('context-menu');
@@ -96,6 +112,7 @@ function newProject() {
     updateSummary();
     showMessage('New project started', 'success');
 }
+window.newProject = newProject;
 
 async function openProject() {
     if (window.showOpenFilePicker) {
@@ -155,6 +172,7 @@ async function openProject() {
         input.click();
     }
 }
+window.openProject = openProject;
 
 async function save() {
     if (projectFileHandle) {
@@ -174,6 +192,7 @@ async function save() {
         saveAs();
     }
 }
+window.save = save;
 
 async function saveAs() {
     const state = historyManager.getCurrentState();
@@ -213,3 +232,27 @@ async function saveAs() {
         showMessage('Project saved', 'success');
     }
 }
+window.saveAs = saveAs;
+
+function hideAllMenus() {
+    const menus = document.querySelectorAll('[data-menu]');
+    menus.forEach(menu => {
+        menu.querySelector('.menu-dropdown').classList.add('hidden');
+    });
+}
+
+function handleHeaderMenuItemClick(event, message, actionFunction) {
+    event.stopPropagation(); // Prevent event from bubbling up to menu button
+    showMessage(message, 'info');
+    actionFunction();
+    hideAllMenus();
+}
+window.handleHeaderMenuItemClick = handleHeaderMenuItemClick;
+
+function handleContextMenuItemClick(event, message, actionFunction) {
+    event.stopPropagation(); // Prevent event from bubbling up to context menu
+    showMessage(message, 'info');
+    actionFunction();
+    hideContextMenu();
+}
+window.handleContextMenuItemClick = handleContextMenuItemClick;

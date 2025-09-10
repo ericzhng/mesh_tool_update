@@ -22,6 +22,7 @@ function uploadMesh() {
             appState.meshLoaded = false; // Set to false on upload error
         });
 }
+window.uploadMesh = uploadMesh;
 
 function showMesh() {
     if (!appState.meshLoaded) return showMessage('Please load a mesh file first.', 'error');
@@ -47,6 +48,7 @@ function showMesh() {
         appState.meshDisplayed = false; // Set to false on fetch error
     });
 }
+window.showMesh = showMesh;
 
 function clearMesh() {
     if (!appState.meshDisplayed) return showMessage('There is no mesh to clear.', 'error');
@@ -54,6 +56,7 @@ function clearMesh() {
     appState.meshLoaded = false; // Reset state on clear
     appState.meshDisplayed = false; // Reset state on clear
 }
+window.clearMesh = clearMesh;
 
 function exportMatrix() {
     if (!appState.meshDisplayed) return showMessage('Please load and show a mesh before exporting.', 'error');
@@ -62,3 +65,4 @@ function exportMatrix() {
         showMessage('Connectivity matrix logged to the console.', 'info');
     });
 }
+window.exportMatrix = exportMatrix;

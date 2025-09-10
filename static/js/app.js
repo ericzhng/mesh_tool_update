@@ -31,6 +31,9 @@ socket.on('mesh_data', data => {
 
         appState.meshLoaded = true;
         appState.meshDisplayed = true;
+        if (!isDragging) { // Only show message if not a dragging update
+            showMessage('Mesh loaded successfully.', 'success');
+        }
     } else {
         spatialGrid = null;
         appState.meshLoaded = false;
@@ -135,31 +138,38 @@ function addNode() {
     const worldPos = toWorld(rect.width / 2, rect.height / 2);
     const id = mesh.nodes.length ? Math.max(...mesh.nodes.map(n => n.id)) + 1 : 1;
     socket.emit('add_node', { id, x: worldPos.x, y: worldPos.y });
+    showMessage('Node added.', 'success');
 }
+window.addNode = addNode;
 
 function deleteSelected() {
     if (selectedNode) {
         isDeleting = true;
         socket.emit('delete_node', { id: selectedNode.id });
         selectedNode = null;
+        showMessage('Selected node deleted.', 'success');
     }
 }
+window.deleteSelected = deleteSelected;
 
 function addConnection() {
     // Placeholder for add connection functionality
     showMessage('Add Connection functionality not yet implemented.', 'info');
 }
+window.addConnection = addConnection;
 
 function removeConnection() {
     // Placeholder for remove connection functionality
     showMessage('Remove Connection functionality not yet implemented.', 'info');
 }
+window.removeConnection = removeConnection;
 
 function updateSummary() { // Removed argument
     const summaryDiv = document.getElementById('summary');
     summaryDiv.innerHTML = (mesh.nodes.length > 0 || mesh.connections.length > 0 || mesh.elements.length > 0) ? 
         `Nodes: <strong>${mesh.nodes.length}</strong>, Lines: <strong>${mesh.connections.length}</strong>, Elements: <strong>${mesh.elements.length}</strong>` : 'No mesh loaded';
 }
+window.updateSummary = updateSummary;
 
 // --- EVENT LISTENERS ---
 
@@ -190,4 +200,4 @@ function toggleCheckboxAndRedraw(checkboxId) {
         scheduleDrawMesh();
     }
 }
-
+window.toggleCheckboxAndRedraw = toggleCheckboxAndRedraw;
