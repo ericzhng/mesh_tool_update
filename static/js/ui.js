@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function showMessage(msg, type = 'info', duration = 3000) {
-    const messageDiv = document.getElementById('message');
+    const messageDiv = document.getElementById('status-message');
     messageDiv.textContent = msg;
     messageDiv.classList.remove('bg-red-500', 'bg-green-500', 'bg-gray-800', 'opacity-0', 'pointer-events-none');
     if (type === 'error') {
@@ -62,16 +62,12 @@ function hideContextMenu() {
 }
 
 function updateUndoRedoButtons() {
-    console.log("Updating undo/redo buttons");
     const revertButton = document.getElementById('revert-button');
     const forwardButton = document.getElementById('forward-button');
 
     if (!historyManager || !revertButton || !forwardButton) {
         return;
     }
-
-    console.log("History pointer:", historyManager.pointer);
-    console.log("History length:", historyManager.history.length);
 
     if (historyManager.pointer > 0) {
         revertButton.classList.remove('disabled');

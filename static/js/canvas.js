@@ -14,6 +14,8 @@
     let selectRect = null;
     let viewChanged = false;
 
+    const debouncedPushStateToHistory = debounce(window.pushStateToHistory, 250);
+
     // New flags for selection modes
     let isCtrlSelecting = false; // For Ctrl/Cmd + drag (deselection)
     let isShiftSelecting = false; // For Shift + drag (addition)
@@ -31,18 +33,30 @@
             ctx.resetTransform();
             ctx.scale(dpr, dpr);
         }
-        scheduleDrawMesh();
+        _scheduleDrawMeshInternal();
     }
 
-    function scheduleDrawMesh() {
+    function _scheduleDrawMeshInternal() {
+        
+        // Ensure drawPending is reset if it somehow got stuck
+        if (view.drawPending) {
+            
+            view.drawPending = false; // Force reset for debugging
+        }
+
         if (!view.drawPending) {
             view.drawPending = true;
             window.requestAnimationFrame(() => {
                 drawMesh();
                 view.drawPending = false;
+                
             });
+        } else {
+            console.log("_scheduleDrawMeshInternal: Already pending, skipping redraw.");
         }
     }
+
+    const scheduleDrawMesh = throttle(_scheduleDrawMeshInternal, 16);
 
     function toScreen(x, y) {
         const cosR = Math.cos(view.rotation), sinR = Math.sin(view.rotation);
@@ -88,7 +102,7 @@
         view.offsetY += centerScreen.y - centerWorldNewScreen.y;
 
         scheduleDrawMesh();
-        pushStateToHistory();
+        window.pushStateToHistory();
     }
 
     window.drawMesh = function() { // Expose drawMesh globally
@@ -250,7 +264,7 @@
         view.offsetY = rect.height / 2 - centerY * view.scale;
 
         scheduleDrawMesh();
-        pushStateToHistory();
+        window.pushStateToHistory();
     }
 
     function getMousePos(e) {
@@ -363,7 +377,7 @@
 
     window.addEventListener('mouseup', e => {
         if (viewChanged) {
-            pushStateToHistory();
+            window.pushStateToHistory();
             viewChanged = false;
         }
         if (isSelecting && selectRect) { // Only process if a selection rectangle was drawn
@@ -439,7 +453,7 @@
         view.offsetX -= newScreenPos.x - pos.x;
         view.offsetY -= newScreenPos.y - pos.y;
         scheduleDrawMesh();
-        pushStateToHistory();
+        window.pushStateToHistory();
     }, { passive: false });
 
     canvas.addEventListener('contextmenu', e => {

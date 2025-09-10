@@ -32,7 +32,7 @@ class HistoryManager {
         this.pointer = -1;
         this.state = state;
         this.callbacks = callbacks;
-        console.log("HistoryManager initialized. Pointer:", this.pointer, "History:", this.history.length);
+        console.log(`HistoryManager initialized. Pointer: ${this.pointer}, History Length: ${this.history.length}`);
         this.updateButtons();
     }
 
@@ -45,14 +45,14 @@ class HistoryManager {
         this.history.push(currentState);
         this.pointer++;
         this.saveToLocalStorage();
-        console.log("State pushed. Pointer:", this.pointer, "History:", this.history.length);
+        console.log(`State pushed. Pointer: ${this.pointer}, History Length: ${this.history.length}`);
         this.updateButtons();
     }
 
     undo() {
         if (this.pointer > 0) {
             this.pointer--;
-            console.log("Undo. Pointer:", this.pointer, "History:", this.history.length);
+            console.log(`Undo operation. Pointer: ${this.pointer}, History Length: ${this.history.length}`);
             this.applyState();
         } else {
             console.log("Cannot undo. Pointer at start.");
@@ -62,7 +62,7 @@ class HistoryManager {
     redo() {
         if (this.pointer < this.history.length - 1) {
             this.pointer++;
-            console.log("Redo. Pointer:", this.pointer, "History:", this.history.length);
+            console.log(`Redo operation. Pointer: ${this.pointer}, History Length: ${this.history.length}`);
             this.applyState();
         } else {
             console.log("Cannot redo. Pointer at end.");
@@ -71,13 +71,14 @@ class HistoryManager {
 
     applyState() {
         const stateToApply = JSON.parse(JSON.stringify(this.history[this.pointer]));
+
         this.state.mesh = stateToApply.mesh;
         this.state.view = stateToApply.view;
         this.state.appState = stateToApply.appState;
 
         this.callbacks.onStateApplied();
         this.saveToLocalStorage();
-        console.log("State applied. Pointer:", this.pointer, "History:", this.history.length);
+        console.log(`State applied. Pointer: ${this.pointer}, History Length: ${this.history.length}`);
         this.updateButtons();
     }
 
@@ -93,7 +94,7 @@ class HistoryManager {
             const state = JSON.parse(savedState);
             this.history = [state];
             this.pointer = 0;
-            console.log("State loaded from localStorage. Pointer:", this.pointer, "History:", this.history.length);
+            console.log(`State loaded from localStorage. Pointer: ${this.pointer}, History Length: ${this.history.length}`);
             this.applyState();
             return true;
         }
@@ -103,9 +104,9 @@ class HistoryManager {
 
     getCurrentState() {
         return {
-            mesh: this.state.mesh,
-            view: this.state.view,
-            appState: this.state.appState,
+            mesh: JSON.parse(JSON.stringify(this.state.mesh)),
+            view: JSON.parse(JSON.stringify(this.state.view)),
+            appState: JSON.parse(JSON.stringify(this.state.appState)),
         };
     }
 
@@ -117,3 +118,10 @@ class HistoryManager {
 }
 
 let historyManager;
+
+function pushStateToHistory() {
+    if (historyManager) {
+        historyManager.pushState();
+    }
+}
+window.pushStateToHistory = pushStateToHistory;

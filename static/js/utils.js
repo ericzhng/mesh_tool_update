@@ -10,3 +10,12 @@ function throttle(func, limit) {
         }
     }
 }
+
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        const context = this || window;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+}

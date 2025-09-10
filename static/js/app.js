@@ -70,6 +70,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const callbacks = {
         onStateApplied: () => {
+            // console.log("onStateApplied callback triggered. Current mesh:", mesh);
             // Rebuild nodesMap and spatialGrid
             nodesMap = new Map(mesh.nodes.map(n => [n.id, n]));
             if (mesh.nodes.length > 0) {
@@ -89,6 +90,7 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             scheduleDrawMesh();
             updateSummary();
+            // console.log("onStateApplied callback finished. Mesh after rebuild:", mesh);
         },
         onHistoryChange: () => {
             updateUndoRedoButtons();
@@ -189,10 +191,3 @@ function toggleCheckboxAndRedraw(checkboxId) {
     }
 }
 
-function pushStateToHistory() {
-    console.log("Pushing state to history");
-    if (historyManager) {
-        historyManager.pushState();
-    }
-}
-window.pushStateToHistory = pushStateToHistory;
