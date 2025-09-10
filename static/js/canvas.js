@@ -12,6 +12,7 @@
     let isSelecting = false;
     let selectStart = { x: 0, y: 0 };
     let selectRect = null;
+    let viewChanged = false;
 
     // New flags for selection modes
     let isCtrlSelecting = false; // For Ctrl/Cmd + drag (deselection)
@@ -34,11 +35,11 @@
     }
 
     function scheduleDrawMesh() {
-        if (!drawPending) {
-            drawPending = true;
+        if (!view.drawPending) {
+            view.drawPending = true;
             window.requestAnimationFrame(() => {
                 drawMesh();
-                drawPending = false;
+                view.drawPending = false;
             });
         }
     }
@@ -87,6 +88,7 @@
         view.offsetY += centerScreen.y - centerWorldNewScreen.y;
 
         scheduleDrawMesh();
+        pushStateToHistory();
     }
 
     window.drawMesh = function() { // Expose drawMesh globally
@@ -248,6 +250,7 @@
         view.offsetY = rect.height / 2 - centerY * view.scale;
 
         scheduleDrawMesh();
+        pushStateToHistory();
     }
 
     function getMousePos(e) {
@@ -336,11 +339,13 @@
         if (isPanning) {
             view.offsetX += e.movementX;
             view.offsetY += e.movementY;
+            viewChanged = true;
         }
         else if (isRotating) {
             const dx = e.clientX - panStart.x;
             view.rotation += dx * 0.01;
             panStart = { x: e.clientX, y: e.clientY };
+            viewChanged = true;
         }
         else if (draggingNode) {
             const worldPos = toWorld(pos.x, pos.y);
@@ -357,6 +362,10 @@
     }, 16));
 
     window.addEventListener('mouseup', e => {
+        if (viewChanged) {
+            pushStateToHistory();
+            viewChanged = false;
+        }
         if (isSelecting && selectRect) { // Only process if a selection rectangle was drawn
             // Transform all four corners of the screen selectRect to world coordinates
             const p1 = toWorld(selectRect.x, selectRect.y);
@@ -430,7 +439,8 @@
         view.offsetX -= newScreenPos.x - pos.x;
         view.offsetY -= newScreenPos.y - pos.y;
         scheduleDrawMesh();
-    });
+        pushStateToHistory();
+    }, { passive: false });
 
     canvas.addEventListener('contextmenu', e => {
         e.preventDefault(); // Prevent default browser context menu

@@ -61,6 +61,31 @@ function hideContextMenu() {
     contextMenu.classList.add('hidden');
 }
 
+function updateUndoRedoButtons() {
+    console.log("Updating undo/redo buttons");
+    const revertButton = document.getElementById('revert-button');
+    const forwardButton = document.getElementById('forward-button');
+
+    if (!historyManager || !revertButton || !forwardButton) {
+        return;
+    }
+
+    console.log("History pointer:", historyManager.pointer);
+    console.log("History length:", historyManager.history.length);
+
+    if (historyManager.pointer > 0) {
+        revertButton.classList.remove('disabled');
+    } else {
+        revertButton.classList.add('disabled');
+    }
+
+    if (historyManager.pointer < historyManager.history.length - 1) {
+        forwardButton.classList.remove('disabled');
+    } else {
+        forwardButton.classList.add('disabled');
+    }
+}
+
 function newProject() {
     projectFileHandle = null;
     mesh = { nodes: [], connections: [], elements: [] };

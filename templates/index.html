@@ -61,11 +61,11 @@
                         <div class="relative" data-menu>
                             <button class="menu-button hover:bg-[#001F3F] px-3 py-2 rounded-md">Edit</button>
                             <div class="menu-dropdown absolute left-0 mt-2 w-56 bg-white text-gray-800 rounded-md shadow-lg py-1 hidden">
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="historyManager.undo()">
+                                <a href="#" id="revert-button" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="historyManager.undo()">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15l-3-3m0 0l3-3m-3 3h8A5 5 0 0121 12a5 5 0 01-5 5H5" /></svg>
                                     Revert
                                 </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="historyManager.redo()">
+                                <a href="#" id="forward-button" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="historyManager.redo()">
                                     <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 15l3-3m0 0l-3-3m3 3H5A5 5 0 010 12a5 5 0 015-5h8" /></svg>
                                     Forward
                                 </a>

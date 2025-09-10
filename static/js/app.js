@@ -89,6 +89,9 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             scheduleDrawMesh();
             updateSummary();
+        },
+        onHistoryChange: () => {
+            updateUndoRedoButtons();
         }
     };
 
@@ -185,3 +188,11 @@ function toggleCheckboxAndRedraw(checkboxId) {
         scheduleDrawMesh();
     }
 }
+
+function pushStateToHistory() {
+    console.log("Pushing state to history");
+    if (historyManager) {
+        historyManager.pushState();
+    }
+}
+window.pushStateToHistory = pushStateToHistory;
