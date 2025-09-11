@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-function showMessage(msg, type = 'info', duration = 1000) { // Default duration to 1000ms (1 second)
+function showMessage(msg, type = 'info', duration = 3000) { // Default duration to 3000ms (3 seconds)
     const messageDiv = document.getElementById('status-message');
     messageDiv.textContent = msg;
     // Remove all type-related classes first
