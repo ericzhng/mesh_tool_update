@@ -35,6 +35,7 @@ function showMesh() {
         return response.json();
     }).then(data => {
         if (data.nodes && data.nodes.length > 0) {
+            appState.isNewImport = true; // Set flag for recentering
             socket.emit('get_mesh', data);
             showMessage('Mesh displayed.', 'success');
             appState.meshDisplayed = true; // Set to true when mesh is displayed
