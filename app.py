@@ -69,7 +69,7 @@ def load_mesh():
 
 @app.route("/last_mesh")
 def last_mesh():
-    """Returns the last loaded mesh."""
+    """Returns the last loaded."""
     # If mesh is empty but last file exists, reload it
     if (
         not mesh["nodes"]
@@ -87,9 +87,9 @@ def last_mesh():
 
 
 @socketio.on("get_mesh")
-def handle_get_mesh(data):
+def handle_get_mesh(data=None):
     """Handles a request to get the current mesh."""
-    emit("mesh_data", {"mesh": mesh, "isDragging": False}) # Changed 'data' to 'mesh'
+    emit("mesh_data", {"mesh": mesh, "isDragging": False})
 
 
 @socketio.on("add_node")
@@ -136,8 +136,7 @@ def handle_update_node(data):
             except Exception as e:
                 print(f"Error saving mesh after single node update: {e}")
 
-    if not is_dragging: # Only emit mesh_data if not currently dragging
-        emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id}, broadcast=True)
+    emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
@@ -146,6 +145,7 @@ def handle_update_nodes_bulk(data):
     """Handles a request to update multiple nodes in the mesh."""
     updated_nodes_data = data.get("nodes", [])
     is_dragging = data.get("isDragging", False)
+    dragging_node_id = data.get("draggingNodeId")
 
     # Create a dictionary for quick lookup of nodes by ID
     nodes_to_update_map = {node_data["id"]: node_data for node_data in updated_nodes_data}
@@ -165,8 +165,42 @@ def handle_update_nodes_bulk(data):
             except Exception as e:
                 print(f"Error saving mesh after bulk update: {e}")
 
-    if not is_dragging: # Only emit mesh_data if not currently dragging
-        emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging}, broadcast=True)
+    emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id}, broadcast=True)
+    emit("mesh_summary", get_mesh_summary(), broadcast=True)
+
+
+@socketio.on("delete_nodes_bulk")
+def handle_delete_nodes_bulk(data):
+    """Handles a request to delete multiple nodes from the mesh."""
+    node_ids_to_delete = set(data.get("ids", []))
+
+    # Filter out deleted nodes
+    mesh["nodes"] = [n for n in mesh["nodes"] if n["id"] not in node_ids_to_delete]
+
+    # Filter out connections involving deleted nodes
+    mesh["connections"] = [
+        c
+        for c in mesh["connections"]
+        if c["source"] not in node_ids_to_delete and c["target"] not in node_ids_to_delete
+    ]
+
+    # Filter out elements involving deleted nodes
+    mesh["elements"] = [
+        e
+        for e in mesh["elements"]
+        if not any(node_id in node_ids_to_delete for node_id in e["node_ids"])
+    ]
+
+    # Save the mesh after bulk deletion
+    if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
+        file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
+        if file_ext == ".inp" or file_ext == ".deck":
+            try:
+                abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
+            except Exception as e:
+                print(f"Error saving mesh after bulk deletion: {e}")
+
+    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
@@ -174,6 +208,16 @@ def handle_update_nodes_bulk(data):
 def handle_add_connection(data):
     """Handles a request to add a connection to the mesh."""
     mesh["connections"].append(data)
+
+    # Save the mesh after adding a connection
+    if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
+        file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
+        if file_ext == ".inp" or file_ext == ".deck":
+            try:
+                abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
+            except Exception as e:
+                print(f"Error saving mesh after adding connection: {e}")
+
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 

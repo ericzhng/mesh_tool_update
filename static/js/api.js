@@ -67,7 +67,7 @@ function exportMatrix() {
 }
 window.exportMatrix = exportMatrix;
 
-function sendBulkNodeUpdate(nodesData, isDragging = false) {
-    socket.emit('update_nodes_bulk', { nodes: nodesData, isDragging: isDragging });
+function sendBulkNodeUpdate(nodesData, isDragging = false, draggingNodeId = null) {
+    socket.emit('update_nodes_bulk', { nodes: nodesData, isDragging: isDragging, draggingNodeId: draggingNodeId });
 }
 window.sendBulkNodeUpdate = sendBulkNodeUpdate;

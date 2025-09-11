@@ -1,11 +1,13 @@
 (function() {
     const canvas = document.getElementById('mesh-canvas');
+    window.canvas = canvas; // Expose canvas globally
     const ctx = canvas.getContext('2d');
 
     let isPanning = false;
     let isRotating = false;
     let panStart = { x: 0, y: 0 };
     let selectedNodes = [];
+    window.selectedNodes = selectedNodes; // Expose selectedNodes globally
     let draggingNode = null;
     let dragOffset = { x: 0, y: 0 };
     let isDraggingGroup = false; // New flag for group dragging
@@ -321,45 +323,86 @@
             isShiftSelecting = e.shiftKey;
 
             if (clickedNode) {
-                const isNodeAlreadySelected = selectedNodes.includes(clickedNode);
-
-                if (isCtrlSelecting) { // Ctrl/Cmd click to toggle selection
-                    const index = selectedNodes.indexOf(clickedNode);
-                    if (index > -1) {
-                        selectedNodes.splice(index, 1); // Remove if already selected
+                if (appState.addConnectionMode) {
+                    if (appState.firstNodeForConnection === null) {
+                        appState.firstNodeForConnection = clickedNode;
+                        showMessage(`First node selected: ${clickedNode.id}. Click on the second node.`, 'info');
                     } else {
-                        selectedNodes.push(clickedNode); // Add if not selected
-                    }
-                } else if (isShiftSelecting) { // Shift click to add to selection
-                    if (!isNodeAlreadySelected) {
-                        selectedNodes.push(clickedNode);
-                    }
-                } else { // No modifier key
-                    if (!isNodeAlreadySelected) { // If clicked node is not selected, clear selection and select it
-                        selectedNodes = [clickedNode];
-                    }
-                    // If clicked node is already selected, we assume the user wants to drag the group
-                    // No change to selectedNodes, proceed to dragging logic
-                }
+                        const sourceId = appState.firstNodeForConnection.id;
+                        const targetId = clickedNode.id;
 
-                if (selectedNodes.includes(clickedNode)) { // If the clicked node is now part of the selection (either single or group)
-                    draggingNode = clickedNode; // The node that initiated the drag
-                    dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
-                    if (selectedNodes.length > 1 && isNodeAlreadySelected && !isCtrlSelecting && !isShiftSelecting) {
-                        isDraggingGroup = true; // Flag for group drag
-                    } else {
-                        isDraggingGroup = false; // Single node drag
+                        if (sourceId === targetId) {
+                            showMessage('Cannot connect a node to itself. Select a different node.', 'error');
+                        } else {
+                            // Check for existing connection (both directions)
+                            const connectionExists = mesh.connections.some(conn =>
+                                (conn.source === sourceId && conn.target === targetId) ||
+                                (conn.source === targetId && conn.target === sourceId)
+                            );
+
+                            if (connectionExists) {
+                                showMessage('Connection already exists between these nodes.', 'error');
+                            } else {
+                                socket.emit('add_connection', { source: sourceId, target: targetId });
+                                showMessage(`Connection added between ${sourceId} and ${targetId}.`, 'success');
+                            }
+                        }
+                        appState.addConnectionMode = false; // Exit mode after attempt
+                        appState.firstNodeForConnection = null; // Clear first node
+                        canvas.style.cursor = 'default'; // Reset cursor
                     }
-                } else { // Clicked node was deselected by Ctrl/Cmd click, no drag
-                    draggingNode = null;
-                    isDraggingGroup = false;
+                } else { // Existing selection/drag logic
+                    const isNodeAlreadySelected = selectedNodes.includes(clickedNode);
+
+                    if (isCtrlSelecting) { // Ctrl/Cmd click to toggle selection
+                        const index = selectedNodes.indexOf(clickedNode);
+                        if (index > -1) {
+                            selectedNodes.splice(index, 1); // Remove if already selected
+                        } else {
+                            selectedNodes.push(clickedNode); // Add if not selected
+                        }
+                    } else if (isShiftSelecting) { // Shift click to add to selection
+                        if (!isNodeAlreadySelected) {
+                            selectedNodes.push(clickedNode);
+                        }
+                    } else { // No modifier key
+                        if (!isNodeAlreadySelected) { // If clicked node is not selected, clear selection and select it
+                            selectedNodes = [clickedNode];
+                        }
+                        // If clicked node is already selected, we assume the user wants to drag the group
+                        // No change to selectedNodes, proceed to dragging logic
+                    }
+
+                    if (selectedNodes.includes(clickedNode)) { // If the clicked node is now part of the selection (either single or group)
+                        draggingNode = clickedNode; // The node that initiated the drag
+                        dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
+                        if (selectedNodes.length > 1 && isNodeAlreadySelected && !isCtrlSelecting && !isShiftSelecting) {
+                            isDraggingGroup = true; // Flag for group drag
+                        } else {
+                            isDraggingGroup = false; // Single node drag
+                        }
+                    } else { // Clicked node was deselected by Ctrl/Cmd click, no drag
+                        draggingNode = null;
+                        isDraggingGroup = false;
+                    }
                 }
-            } else { // Clicked on empty space, start rect select
-                if (!isCtrlSelecting && !isShiftSelecting) {
-                    selectedNodes = []; // Clear selection on empty click if no modifier
+            } else { // Clicked on empty space
+                if (appState.addNodeMode) {
+                    const id = mesh.nodes.length ? Math.max(...mesh.nodes.map(n => n.id)) + 1 : 1;
+                    socket.emit('add_node', { id, x: worldPos.x, y: worldPos.y });
+                    showMessage('Node added.', 'success');
+                } else if (appState.addConnectionMode) { // If in add connection mode and clicked empty space, cancel
+                    appState.addConnectionMode = false;
+                    appState.firstNodeForConnection = null;
+                    canvas.style.cursor = 'default';
+                    showMessage('Add Connection mode cancelled.', 'info');
+                } else { // Start rect select if not in any special mode
+                    if (!isCtrlSelecting && !isShiftSelecting) {
+                        selectedNodes = []; // Clear selection on empty click if no modifier
+                    }
+                    isSelecting = true;
+                    selectStart = pos;
                 }
-                isSelecting = true;
-                selectStart = pos;
             }
         }
         else if (e.button === 2) { // Right click
@@ -378,7 +421,6 @@
             view.offsetY += e.movementY;
             viewChanged = true;
             hasDragged = true;
-            // console.log("Current view.scale:", view.scale);
         }
         else if (isRotating) {
             const dx = e.clientX - panStart.x;
@@ -389,24 +431,18 @@
         }
         else if (draggingNode) {
             const worldPos = toWorld(pos.x, pos.y);
-            const deltaX = (worldPos.x + dragOffset.x) - draggingNode.x;
-            const deltaY = (worldPos.y + dragOffset.y) - draggingNode.y;
-
             if (isDraggingGroup) {
-                const updatedNodes = [];
+                const deltaX = (worldPos.x + dragOffset.x) - draggingNode.x;
+                const deltaY = (worldPos.y + dragOffset.y) - draggingNode.y;
                 selectedNodes.forEach(node => {
                     const newX = node.x + deltaX;
                     const newY = node.y + deltaY;
-                    window.updateNodePosition(node.id, newX, newY); // Update local state
-                    updatedNodes.push({ id: node.id, x: newX, y: newY });
+                    window.updateNodePosition(node.id, newX, newY); // Update local state only
                 });
-                // Send bulk update to server using the new API function
-                window.sendBulkNodeUpdate(updatedNodes, true);
             } else {
                 const newX = worldPos.x + dragOffset.x;
                 const newY = worldPos.y + dragOffset.y;
-                window.updateNodePosition(draggingNode.id, newX, newY);
-                socket.emit('update_node', { id: draggingNode.id, x: newX, y: newY, isDragging: true, draggingNodeId: draggingNode.id });
+                window.updateNodePosition(draggingNode.id, newX, newY); // Update local state only
             }
             hasDragged = true;
         }
@@ -420,30 +456,35 @@
     }, 16));
 
     window.addEventListener('mouseup', e => {
+        const wasDragging = draggingNode || isDraggingGroup;
+        const wasSelecting = isSelecting && selectRect;
+
         if (hasDragged) {
             window.pushStateToHistory();
+            
+            // Send final positions to the server after drag ends
+            if (isDraggingGroup) {
+                const updatedNodes = selectedNodes.map(node => ({ id: node.id, x: node.x, y: node.y }));
+                window.sendBulkNodeUpdate(updatedNodes, false, null); // Final update, not dragging anymore
+            } else if (draggingNode) {
+                socket.emit('update_node', { id: draggingNode.id, x: draggingNode.x, y: draggingNode.y, isDragging: false, draggingNodeId: null });
+            }
             hasDragged = false;
         }
-        if (isSelecting && selectRect) { // Only process if a selection rectangle was drawn
-            // Transform all four corners of the screen selectRect to world coordinates
+
+        if (wasSelecting) {
             const p1 = toWorld(selectRect.x, selectRect.y);
             const p2 = toWorld(selectRect.x + selectRect.w, selectRect.y);
             const p3 = toWorld(selectRect.x, selectRect.y + selectRect.h);
             const p4 = toWorld(selectRect.x + selectRect.w, selectRect.y + selectRect.h);
-
-            // Calculate the true min/max world coordinates from these four transformed corners
             const minWorldX = Math.min(p1.x, p2.x, p3.x, p4.x);
             const maxWorldX = Math.max(p1.x, p2.x, p3.x, p4.x);
             const minWorldY = Math.min(p1.y, p2.y, p3.y, p4.y);
             const maxWorldY = Math.max(p1.y, p2.y, p3.y, p4.y);
-
             const queryMin = [minWorldX, minWorldY];
             const queryMax = [maxWorldX, maxWorldY];
-
             const nodesInRectCandidate = spatialGrid ? spatialGrid.query({ min: queryMin, max: queryMax }) : [];
             let nodesInRect = [];
-
-            // Perform a precise check to ensure nodes are actually within the screen-drawn selectRect
             nodesInRectCandidate.forEach(node => {
                 const screenPos = toScreen(node.x, node.y);
                 if (screenPos.x >= selectRect.x && screenPos.x <= (selectRect.x + selectRect.w) &&
@@ -451,42 +492,34 @@
                     nodesInRect.push(node);
                 }
             });
-
-            // Apply selection based on modifier keys
-            if (isCtrlSelecting) { // Ctrl/Cmd drag for deselection
+            if (isCtrlSelecting) {
                 const currentSelection = new Set(selectedNodes);
-                nodesInRect.forEach(node => {
-                    currentSelection.delete(node);
-                });
+                nodesInRect.forEach(node => { currentSelection.delete(node); });
                 selectedNodes = Array.from(currentSelection);
-            } else if (isShiftSelecting) { // Shift drag for addition
+            } else if (isShiftSelecting) {
                 const currentSelection = new Set(selectedNodes);
-                nodesInRect.forEach(node => {
-                    currentSelection.add(node);
-                });
+                nodesInRect.forEach(node => { currentSelection.add(node); });
                 selectedNodes = Array.from(currentSelection);
-            } else { // Regular rect select, replace current selection
+            } else {
                 selectedNodes = nodesInRect;
             }
         }
+
+        // Reset all state
         draggingNode = null;
         isPanning = false;
         isRotating = false;
         isSelecting = false;
-        isDraggingGroup = false; // Reset group dragging flag
+        isDraggingGroup = false;
         selectRect = null;
         canvas.style.cursor = 'crosshair';
-
-        // Clear selection flags
         isCtrlSelecting = false;
         isShiftSelecting = false;
 
-        if (e.button === 2) { // Right click released
+        if (e.button === 2 && !wasDragging && !wasSelecting) { // Show context menu only on simple right click
             showContextMenu(e);
-        } else if (draggingNode || isDraggingGroup) { // If a drag operation just finished
-            // Request the latest mesh data from the server to ensure sync
-            socket.emit('get_mesh');
         }
+        
         scheduleDrawMesh();
     });
 
@@ -497,14 +530,33 @@
         const zoomFactor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
         view.scale = Math.max(0.01, Math.min(view.scale * zoomFactor, 1000));
         const newScreenPos = toScreen(worldPos.x, worldPos.y);
-        view.offsetX -= newScreenPos.x - pos.x;
-        view.offsetY -= newScreenPos.y - pos.y;
+        view.offsetX += pos.x - newScreenPos.x;
+        view.offsetY += pos.y - newScreenPos.y;
         debouncedPushStateToHistory(); // Record zoom in history
         scheduleDrawMesh();
     }, { passive: false });
 
     canvas.addEventListener('contextmenu', e => {
         e.preventDefault(); // Prevent default browser context menu
+    });
+
+    window.addEventListener('keydown', e => {
+        if (e.key === 'Delete' || e.key === 'Backspace') { // Check for Delete or Backspace key
+            if (selectedNodes.length > 0) {
+                e.preventDefault(); // Prevent default browser behavior (e.g., navigating back)
+                window.deleteSelected(); // Call the delete function
+            }
+        } else if (e.key === 'Enter') { // Check for Enter key
+            if (appState.isEditingMode) {
+                e.preventDefault(); // Prevent default browser behavior
+                appState.addNodeMode = false;
+                appState.addConnectionMode = false;
+                appState.firstNodeForConnection = null;
+                appState.isEditingMode = false;
+                canvas.style.cursor = 'default';
+                showMessage('Editing mode cancelled.', 'info');
+            }
+        }
     });
 
     // Expose functions to the global scope

@@ -12,11 +12,12 @@ socket.on('mesh_data', data => {
     // console.log('Received meshData:', meshData); // Added for debugging
 
     if (isDragging && draggingNodeId !== null) {
-        // During dragging, only update nodes that are NOT the dragging node
-        // The dragging node's position is already updated locally by window.updateNodePosition
+        // During dragging, only update nodes that are NOT part of the current selection
+        // The selected nodes' positions are already updated locally in the mousemove handler
+        const selectedNodeIds = new Set(window.selectedNodes.map(n => n.id));
         const updatedNodesMap = new Map(meshData.nodes.map(n => [n.id, n]));
         for (const localNode of mesh.nodes) {
-            if (localNode.id !== draggingNodeId) {
+            if (!selectedNodeIds.has(localNode.id)) {
                 const serverNode = updatedNodesMap.get(localNode.id);
                 if (serverNode) {
                     localNode.x = serverNode.x;
@@ -61,9 +62,11 @@ socket.on('mesh_data', data => {
         showMessage('Mesh cleared.', 'success');
     }
 
-    if (!isDeleting && !isDragging) {
-        centerAndDrawMesh(mesh);
-    }
+    // The following condition would recenter the view after many operations (like node drags)
+    // which is undesirable. The user can recenter manually with the Home button.
+    // if (!isDeleting && !isDragging && !appState.isEditingMode) {
+    //     centerAndDrawMesh(mesh);
+    // }
     isDeleting = false;
 
     scheduleDrawMesh();
@@ -149,27 +152,52 @@ window.addEventListener('DOMContentLoaded', () => {
 // --- MESH OPERATIONS ---
 
 function addNode() {
-    const rect = canvas.getBoundingClientRect();
-    const worldPos = toWorld(rect.width / 2, rect.height / 2);
-    const id = mesh.nodes.length ? Math.max(...mesh.nodes.map(n => n.id)) + 1 : 1;
-    socket.emit('add_node', { id, x: worldPos.x, y: worldPos.y });
-    showMessage('Node added.', 'success');
+    appState.addNodeMode = !appState.addNodeMode; // Toggle add node mode
+    appState.isEditingMode = appState.addNodeMode; // Set isEditingMode based on addNodeMode
+
+    if (appState.addNodeMode) {
+        // Deactivate other editing modes if active
+        appState.addConnectionMode = false;
+        appState.firstNodeForConnection = null;
+
+        canvas.style.cursor = 'crosshair'; // Change cursor to crosshair
+        showMessage('Add Node mode activated. Click on the canvas to add nodes. Press Enter to exit.', 'info');
+    } else {
+        canvas.style.cursor = 'default'; // Reset cursor
+        showMessage('Add Node mode deactivated.', 'info');
+    }
 }
 window.addNode = addNode;
 
 function deleteSelected() {
-    if (selectedNode) {
+    if (window.selectedNodes.length > 0) {
         isDeleting = true;
-        socket.emit('delete_node', { id: selectedNode.id });
-        selectedNode = null;
-        showMessage('Selected node deleted.', 'success');
+        const nodeIdsToDelete = window.selectedNodes.map(node => node.id);
+        socket.emit('delete_nodes_bulk', { ids: nodeIdsToDelete }); // New bulk delete event
+        window.selectedNodes = []; // Clear selection after deletion
+        showMessage(`Deleted ${nodeIdsToDelete.length} node(s).`, 'success');
+    } else {
+        showMessage('No nodes selected for deletion.', 'info');
     }
 }
 window.deleteSelected = deleteSelected;
 
 function addConnection() {
-    // Placeholder for add connection functionality
-    showMessage('Add Connection functionality not yet implemented.', 'info');
+    appState.addConnectionMode = !appState.addConnectionMode; // Toggle add connection mode
+    appState.isEditingMode = appState.addConnectionMode; // Set isEditingMode based on addConnectionMode
+
+    if (appState.addConnectionMode) {
+        // Deactivate other editing modes if active
+        appState.addNodeMode = false;
+
+        appState.firstNodeForConnection = null; // Reset first node selection
+        canvas.style.cursor = 'crosshair'; // Change cursor to crosshair
+        showMessage('Add Connection mode activated. Click on the first node. Press ESC to exit.', 'info');
+    } else {
+        appState.firstNodeForConnection = null; // Reset first node selection
+        canvas.style.cursor = 'default'; // Reset cursor
+        showMessage('Add Connection mode deactivated.', 'info');
+    }
 }
 window.addConnection = addConnection;
 

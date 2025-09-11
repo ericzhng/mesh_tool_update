@@ -139,6 +139,15 @@
             Home View
         </a>
         <div class="border-t border-gray-200 my-1"></div>
+        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Adding node', () => addNode())">
+            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Add Node
+        </a>
+        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Removing selected', () => deleteSelected())">
+            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Remove Node
+        </a>
+        <div class="border-t border-gray-200 my-1"></div>
         <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Reloading page...', () => reloadPage())">
             <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>

@@ -4,6 +4,10 @@ let spatialGrid = null;
 let appState = {
     meshLoaded: false,
     meshDisplayed: false,
+    addNodeMode: false, // New state for adding nodes
+    addConnectionMode: false, // New state for adding connections
+    firstNodeForConnection: null, // Store the first selected node for connection
+    isEditingMode: false, // New state to indicate if any editing mode is active
 };
 
 let view = { offsetX: 0, offsetY: 0, scale: 1, rotation: 0, drawPending: false };
