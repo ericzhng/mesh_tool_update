@@ -141,10 +141,19 @@ window.addEventListener('DOMContentLoaded', () => {
 
                 appState.meshLoaded = true;
                 appState.meshDisplayed = true;
-                centerAndDrawMesh(mesh);
-                updateSummary();
-                historyManager.pushState();
+            } else {
+                // If no nodes, ensure mesh is empty and state is correct
+                mesh.nodes = [];
+                mesh.connections = [];
+                mesh.elements = [];
+                nodesMap = new Map();
+                spatialGrid = null;
+                appState.meshLoaded = false;
+                appState.meshDisplayed = false;
             }
+            centerAndDrawMesh(mesh); // Always call after initial load
+            updateSummary();
+            historyManager.pushState();
         });
     }
 });
@@ -163,6 +172,10 @@ function updateEditModeIndicator() {
         indicator.textContent = 'Add Connection Mode | Press Enter to Exit';
         indicator.classList.remove('hidden');
         canvas.style.cursor = 'crosshair';
+    } else if (appState.removeNodeMode) { // New: Remove Node Mode
+        indicator.textContent = 'Remove Node Mode | Select nodes to remove | Press Enter to Exit';
+        indicator.classList.remove('hidden');
+        canvas.style.cursor = 'crosshair';
     } else {
         indicator.classList.add('hidden');
         canvas.style.cursor = 'default';
@@ -176,12 +189,27 @@ function addNode() {
 
     if (appState.addNodeMode) {
         appState.addConnectionMode = false;
+        appState.removeNodeMode = false; // Ensure other modes are off
         appState.firstNodeForConnection = null;
     }
     
     updateEditModeIndicator();
 }
 window.addNode = addNode;
+
+function removeNode() { // New function for remove node mode
+    appState.removeNodeMode = !appState.removeNodeMode;
+    appState.isEditingMode = appState.removeNodeMode;
+
+    if (appState.removeNodeMode) {
+        appState.addNodeMode = false; // Ensure other modes are off
+        appState.addConnectionMode = false;
+        appState.firstNodeForConnection = null;
+    }
+    window.selectedNodes = []; // Clear selection when entering/exiting remove mode
+    updateEditModeIndicator();
+}
+window.removeNode = removeNode;
 
 function deleteSelected() {
     if (window.selectedNodes.length > 0) {

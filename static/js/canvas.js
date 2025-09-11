@@ -323,7 +323,11 @@
             isShiftSelecting = e.shiftKey;
 
             if (clickedNode) {
-                if (appState.addConnectionMode) {
+                if (appState.removeNodeMode) { // New: Remove Node Mode
+                    window.selectedNodes = [clickedNode]; // Select the clicked node
+                    window.deleteSelected(); // Immediately delete it
+                    window.selectedNodes = []; // Clear selection after deletion
+                } else if (appState.addConnectionMode) {
                     if (appState.firstNodeForConnection === null) {
                         appState.firstNodeForConnection = clickedNode;
                         showMessage(`First node selected: ${clickedNode.id}. Click on the second node.`, 'info');
@@ -396,6 +400,9 @@
                     appState.firstNodeForConnection = null;
                     canvas.style.cursor = 'default';
                     showMessage('Add Connection mode cancelled.', 'info');
+                } else if (appState.removeNodeMode) { // New: Start rect select for removal
+                    isSelecting = true;
+                    selectStart = pos;
                 } else { // Start rect select if not in any special mode
                     if (!isCtrlSelecting && !isShiftSelecting) {
                         selectedNodes = []; // Clear selection on empty click if no modifier
@@ -492,7 +499,13 @@
                     nodesInRect.push(node);
                 }
             });
-            if (isCtrlSelecting) {
+            if (appState.removeNodeMode) { // New: If in remove node mode, delete selected nodes
+                if (nodesInRect.length > 0) {
+                    window.selectedNodes = nodesInRect; // Temporarily set selectedNodes for deleteSelected
+                    window.deleteSelected();
+                    window.selectedNodes = []; // Clear selection after deletion
+                }
+            } else if (isCtrlSelecting) {
                 const currentSelection = new Set(selectedNodes);
                 nodesInRect.forEach(node => { currentSelection.delete(node); });
                 selectedNodes = Array.from(currentSelection);
@@ -549,8 +562,9 @@
         } else if (e.key === 'Enter') { // Check for Enter key
             if (appState.isEditingMode) {
                 e.preventDefault(); // Prevent default browser behavior
-                appState.addNodeMode = false;
+                                appState.addNodeMode = false;
                 appState.addConnectionMode = false;
+                appState.removeNodeMode = false; // New: Exit remove node mode
                 appState.firstNodeForConnection = null;
                 appState.isEditingMode = false;
                 
