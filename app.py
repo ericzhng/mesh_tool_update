@@ -127,14 +127,14 @@ def handle_update_node(data):
     is_dragging = data.get("isDragging", False)
     dragging_node_id = data.get("draggingNodeId")
 
-    # Save the mesh after single node update
-    if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
-        file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
-        if file_ext == ".inp" or file_ext == ".deck":
-            try:
-                abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
-            except Exception as e:
-                print(f"Error saving mesh after single node update: {e}")
+    # # Save the mesh after single node update (DISABLED BY USER REQUEST)
+    # if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
+    #     file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
+    #     if file_ext == ".inp" or file_ext == ".deck":
+    #         try:
+    #             abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
+    #         except Exception as e:
+    #             print(f"Error saving mesh after single node update: {e}")
 
     emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
@@ -156,14 +156,14 @@ def handle_update_nodes_bulk(data):
             n["x"] = updated_data["x"]
             n["y"] = updated_data["y"]
     
-    # Save the mesh after bulk update
-    if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
-        file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
-        if file_ext == ".inp" or file_ext == ".deck":
-            try:
-                abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
-            except Exception as e:
-                print(f"Error saving mesh after bulk update: {e}")
+    # # Save the mesh after bulk update (DISABLED BY USER REQUEST)
+    # if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
+    #     file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
+    #     if file_ext == ".inp" or file_ext == ".deck":
+    #         try:
+    #             abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
+    #         except Exception as e:
+    #             print(f"Error saving mesh after bulk update: {e}")
 
     emit("mesh_data", {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
@@ -191,14 +191,14 @@ def handle_delete_nodes_bulk(data):
         if not any(node_id in node_ids_to_delete for node_id in e["node_ids"])
     ]
 
-    # Save the mesh after bulk deletion
-    if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
-        file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
-        if file_ext == ".inp" or file_ext == ".deck":
-            try:
-                abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
-            except Exception as e:
-                print(f"Error saving mesh after bulk deletion: {e}")
+    # # Save the mesh after bulk deletion (DISABLED BY USER REQUEST)
+    # if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
+    #     file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
+    #     if file_ext == ".inp" or file_ext == ".deck":
+    #         try:
+    #             abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
+    #         except Exception as e:
+    #             print(f"Error saving mesh after bulk deletion: {e}")
 
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
@@ -209,14 +209,14 @@ def handle_add_connection(data):
     """Handles a request to add a connection to the mesh."""
     mesh["connections"].append(data)
 
-    # Save the mesh after adding a connection
-    if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
-        file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
-        if file_ext == ".inp" or file_ext == ".deck":
-            try:
-                abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
-            except Exception as e:
-                print(f"Error saving mesh after adding connection: {e}")
+    # # Save the mesh after adding a connection (DISABLED BY USER REQUEST)
+    # if last_uploaded_file["path"] and os.path.exists(last_uploaded_file["path"]):
+    #     file_ext = os.path.splitext(last_uploaded_file["path"])[1].lower()
+    #     if file_ext == ".inp" or file_ext == ".deck":
+    #         try:
+    #             abaqusIO.write_abaqus_inp(last_uploaded_file["path"], mesh)
+    #         except Exception as e:
+    #             print(f"Error saving mesh after adding connection: {e}")
 
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)

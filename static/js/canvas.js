@@ -553,8 +553,11 @@
                 appState.addConnectionMode = false;
                 appState.firstNodeForConnection = null;
                 appState.isEditingMode = false;
-                canvas.style.cursor = 'default';
-                showMessage('Editing mode cancelled.', 'info');
+                
+                // Update the UI to remove the indicator
+                if(window.updateEditModeIndicator) {
+                    window.updateEditModeIndicator();
+                }
             }
         }
     });

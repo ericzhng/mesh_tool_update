@@ -151,21 +151,35 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // --- MESH OPERATIONS ---
 
-function addNode() {
-    appState.addNodeMode = !appState.addNodeMode; // Toggle add node mode
-    appState.isEditingMode = appState.addNodeMode; // Set isEditingMode based on addNodeMode
+function updateEditModeIndicator() {
+    const indicator = document.getElementById('edit-mode-indicator');
+    if (!indicator) return;
 
     if (appState.addNodeMode) {
-        // Deactivate other editing modes if active
+        indicator.textContent = 'Add Node Mode | Press Enter to Exit';
+        indicator.classList.remove('hidden');
+        canvas.style.cursor = 'crosshair';
+    } else if (appState.addConnectionMode) {
+        indicator.textContent = 'Add Connection Mode | Press Enter to Exit';
+        indicator.classList.remove('hidden');
+        canvas.style.cursor = 'crosshair';
+    } else {
+        indicator.classList.add('hidden');
+        canvas.style.cursor = 'default';
+    }
+}
+window.updateEditModeIndicator = updateEditModeIndicator;
+
+function addNode() {
+    appState.addNodeMode = !appState.addNodeMode;
+    appState.isEditingMode = appState.addNodeMode;
+
+    if (appState.addNodeMode) {
         appState.addConnectionMode = false;
         appState.firstNodeForConnection = null;
-
-        canvas.style.cursor = 'crosshair'; // Change cursor to crosshair
-        showMessage('Add Node mode activated. Click on the canvas to add nodes. Press Enter to exit.', 'info');
-    } else {
-        canvas.style.cursor = 'default'; // Reset cursor
-        showMessage('Add Node mode deactivated.', 'info');
     }
+    
+    updateEditModeIndicator();
 }
 window.addNode = addNode;
 
@@ -183,21 +197,17 @@ function deleteSelected() {
 window.deleteSelected = deleteSelected;
 
 function addConnection() {
-    appState.addConnectionMode = !appState.addConnectionMode; // Toggle add connection mode
-    appState.isEditingMode = appState.addConnectionMode; // Set isEditingMode based on addConnectionMode
+    appState.addConnectionMode = !appState.addConnectionMode;
+    appState.isEditingMode = appState.addConnectionMode;
 
     if (appState.addConnectionMode) {
-        // Deactivate other editing modes if active
         appState.addNodeMode = false;
-
-        appState.firstNodeForConnection = null; // Reset first node selection
-        canvas.style.cursor = 'crosshair'; // Change cursor to crosshair
-        showMessage('Add Connection mode activated. Click on the first node. Press ESC to exit.', 'info');
+        appState.firstNodeForConnection = null;
     } else {
-        appState.firstNodeForConnection = null; // Reset first node selection
-        canvas.style.cursor = 'default'; // Reset cursor
-        showMessage('Add Connection mode deactivated.', 'info');
+        appState.firstNodeForConnection = null;
     }
+
+    updateEditModeIndicator();
 }
 window.addConnection = addConnection;
 

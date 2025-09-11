@@ -101,7 +101,8 @@
                 </div>
             </nav>
         </header>
-            <main id="main-content" class="flex-grow flex flex-col border-2 border-gray-300 rounded-lg bg-white">
+            <main id="main-content" class="flex-grow flex flex-col border-2 border-gray-300 rounded-lg bg-white relative">
+            <div id="edit-mode-indicator" class="hidden absolute top-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-20"></div>
             <canvas id="mesh-canvas" class="w-full h-full flex-grow"></canvas>
         </main>
         <div id="bottom-status-bar" class="fixed bottom-0 left-0 right-0 p-4 flex justify-between items-end gap-4 h-16 z-50">
