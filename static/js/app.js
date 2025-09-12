@@ -222,10 +222,13 @@ function deleteSelected() {
     if (window.selectedNodes.length > 0) {
         isDeleting = true;
         const nodeIdsToDelete = window.selectedNodes.map(node => node.id);
-        socket.emit('delete_nodes_bulk', { ids: nodeIdsToDelete }); // New bulk delete event
-        window.selectedNodes = []; // Clear selection after deletion
-        showMessage(`Deleted ${nodeIdsToDelete.length} node(s).`, 'success');
-        pushStateToHistory();
+        socket.emit('delete_nodes_bulk', { ids: nodeIdsToDelete }, () => {
+            // This callback is executed after the server confirms the deletion
+            window.selectedNodes = []; // Clear selection after deletion
+            showMessage(`Deleted ${nodeIdsToDelete.length} node(s).`, 'success');
+            pushStateToHistory();
+            isDeleting = false;
+        });
     } else {
         showMessage('No nodes selected for deletion.', 'info');
     }
