@@ -81,7 +81,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     console.log('DOM Content Loaded. Retrieving project file handle...');
     staleFileHandle = await retrieveFileHandle(); // Assign to stale handle
-    console.log('Stale file handle after retrieval:', staleFileHandle);
+    // console.log('Stale file handle after retrieval:', staleFileHandle);
     if (staleFileHandle) {
         // We don't grant permission here, so we just notify the user that we know about the file.
         showMessage(`Previously saved to: ${staleFileHandle.name}. Click Save to commit changes.`, 'info');
@@ -241,6 +241,7 @@ function addConnection() {
 
     if (appState.addConnectionMode) {
         appState.addNodeMode = false;
+        appState.removeNodeMode = false; // Ensure other modes are off
         appState.firstNodeForConnection = null;
     } else {
         appState.firstNodeForConnection = null;

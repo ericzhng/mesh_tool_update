@@ -1,5 +1,6 @@
 import os
-import json
+import tempfile
+import shutil
 
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
@@ -10,60 +11,8 @@ from meshtool import abaqusIO
 app = Flask(__name__)
 socketio = SocketIO(app)
 
-# Mesh data structure
-mesh = {
-    "nodes": [],  # [{'id': int, 'x': float, 'y': float}]
-    "connections": [],  # [{'source': int, 'target': int}]
-    "elements": [],  # [{'id': int, 'node_ids': list}]
-}
 
-UPLOAD_FOLDER = "data"
-ALLOWED_EXTENSIONS = {"csv", "json", "inp", "deck"}
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-MESH_SAVE_PATH = os.path.join(UPLOAD_FOLDER, "mesh_data.json")
-
-
-def save_mesh_to_json():
-    """Saves the current mesh data to a JSON file."""
-    try:
-        with open(MESH_SAVE_PATH, "w") as f:
-            json.dump(mesh, f, indent=4)
-        print(
-            f"[DEBUG] Mesh saved to {MESH_SAVE_PATH}. Nodes: {len(mesh['nodes'])}, Connections: {len(mesh['connections'])}, Elements: {len(mesh['elements'])}"
-        )
-    except Exception as e:
-        print(f"[ERROR] Error saving mesh to JSON: {e}")
-
-
-def load_mesh_from_json():
-    """Loads mesh data from a JSON file into the global mesh object."""
-    global mesh
-    if os.path.exists(MESH_SAVE_PATH):
-        try:
-            with open(MESH_SAVE_PATH, "r") as f:
-                loaded_mesh = json.load(f)
-                mesh["nodes"] = loaded_mesh.get("nodes", [])
-                mesh["connections"] = loaded_mesh.get("connections", [])
-                mesh["elements"] = loaded_mesh.get("elements", [])
-            print(
-                f"[DEBUG] Mesh loaded from {MESH_SAVE_PATH}. Nodes: {len(mesh['nodes'])}, Connections: {len(mesh['connections'])}, Elements: {len(mesh['elements'])}"
-            )
-        except Exception as e:
-            print(f"[ERROR] Error loading mesh from JSON: {e}")
-            # Optionally, clear mesh if loading fails to prevent corrupted state
-            mesh["nodes"] = []
-            mesh["connections"] = []
-            mesh["elements"] = []
-    else:
-        print(
-            f"[DEBUG] No mesh data found at {MESH_SAVE_PATH}, starting with empty mesh."
-        )
-
-
-# Load mesh on startup
-load_mesh_from_json()
+ALLOWED_EXTENSIONS = {"inp", "deck"}
 
 
 def allowed_file(filename):
@@ -97,18 +46,20 @@ def load_mesh():
         return "No selected file", 400
     if file and file.filename and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        temp_dir = tempfile.mkdtemp()
+        filepath = os.path.join(temp_dir, filename)
         file.save(filepath)
         try:
             mesh_data = abaqusIO.read_mesh(filepath)
             mesh["nodes"] = mesh_data["nodes"]
             mesh["connections"] = mesh_data["connections"]
             mesh["elements"] = mesh_data.get("elements", [])
-            save_mesh_to_json()  # Save after loading new mesh
             print(f"[DEBUG] Mesh loaded from uploaded file: {filepath}")
         except Exception as e:
             print(f"[ERROR] Failed to parse mesh from {filepath}: {e}")
             return f"Failed to parse mesh: {e}", 400
+        finally:
+            shutil.rmtree(temp_dir) # Clean up the temporary directory
         return "Mesh loaded", 200
     return "Invalid file", 400
 
@@ -132,7 +83,6 @@ def handle_add_node(data):
     """Handles a request to add a node to the mesh."""
     print(f"[DEBUG] add_node SocketIO event received. Node ID: {data.get('id')}")
     mesh["nodes"].append(data)
-    save_mesh_to_json()  # Save changes
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
@@ -148,7 +98,6 @@ def handle_delete_node(data):
         for c in mesh["connections"]
         if c["source"] != node_id and c["target"] != node_id
     ]
-    save_mesh_to_json()  # Save changes
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
@@ -164,7 +113,6 @@ def handle_update_node(data):
     is_dragging = data.get("isDragging", False)
     dragging_node_id = data.get("draggingNodeId")
 
-    save_mesh_to_json()  # Save changes
     emit(
         "mesh_data",
         {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id},
@@ -193,7 +141,6 @@ def handle_update_nodes_bulk(data):
             n["x"] = updated_data["x"]
             n["y"] = updated_data["y"]
 
-    save_mesh_to_json()  # Save changes
     emit(
         "mesh_data",
         {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id},
@@ -228,7 +175,6 @@ def handle_delete_nodes_bulk(data):
         if not any(node_id in node_ids_to_delete for node_id in e["node_ids"])
     ]
 
-    save_mesh_to_json()  # Save changes
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
@@ -241,7 +187,6 @@ def handle_add_connection(data):
     )
     mesh["connections"].append(data)
 
-    save_mesh_to_json()  # Save changes
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
@@ -261,7 +206,6 @@ def handle_delete_connection(data):
             or (c["source"] == data["target"] and c["target"] == data["source"])
         )
     ]
-    save_mesh_to_json()  # Save changes
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
@@ -273,7 +217,6 @@ def handle_clear_mesh():
     mesh["nodes"] = []
     mesh["connections"] = []
     mesh["elements"] = []
-    save_mesh_to_json()  # Save changes
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
@@ -284,7 +227,6 @@ def handle_sync_mesh(data):
     print("[DEBUG] sync_mesh SocketIO event received.")
     global mesh
     mesh = data.get("mesh", {"nodes": [], "connections": [], "elements": []})
-    save_mesh_to_json()
     # Broadcast the synced mesh to all clients except the sender
     emit(
         "mesh_data",
@@ -299,7 +241,6 @@ def handle_sync_mesh(data):
 def handle_save_mesh():
     """Handles a request to save the mesh to the server."""
     print("[DEBUG] save_mesh SocketIO event received.")
-    save_mesh_to_json()
 
 
 @app.route("/export")
