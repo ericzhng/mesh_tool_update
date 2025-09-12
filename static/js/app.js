@@ -1,6 +1,7 @@
 const socket = io();
 
 let isDeleting = false;
+let lastEmittedConnection = null; // New: To store the last connection emitted to the server
 
 // --- SOCKET.IO HANDLERS ---
 
@@ -67,6 +68,18 @@ socket.on('mesh_data', data => {
         appState.isNewImport = false; // Reset the flag
     }
     isDeleting = false;
+
+    // Highlight the newly added connection if applicable
+    if (window.lastEmittedConnection) {
+        const newConnection = mesh.connections.find(c =>
+            (c.source === window.lastEmittedConnection.source && c.target === window.lastEmittedConnection.target) ||
+            (c.source === window.lastEmittedConnection.target && c.target === window.lastEmittedConnection.source)
+        );
+        if (newConnection) {
+            window.setHighlightedConnection(newConnection.id);
+        }
+        window.lastEmittedConnection = null; // Reset after processing
+    }
 
     scheduleDrawMesh();
     updateSummary(); // Removed argument

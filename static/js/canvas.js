@@ -16,6 +16,9 @@
     let selectRect = null;
     let viewChanged = false;
     let hasDragged = false;
+    let tempConnection = null; // New: To store nodes for a temporary connection line
+    let lastAddedConnection = null; // New: To store the last added connection for highlighting
+    let highlightedConnectionId = null; // New: To store the ID of the connection to be highlighted
 
     const debouncedPushStateToHistory = debounce(window.pushStateToHistory, 250);
 
@@ -183,8 +186,13 @@
                     ctx.beginPath();
                     ctx.moveTo(p1.x, p1.y);
                     ctx.lineTo(p2.x, p2.y);
-                    ctx.strokeStyle = 'rgba(0, 39, 76, 0.6)';
-                    ctx.lineWidth = 1;
+                    if (c.id === highlightedConnectionId) {
+                        ctx.strokeStyle = '#FFFF00'; // Yellow for highlighted connection
+                        ctx.lineWidth = 3;
+                    } else {
+                        ctx.strokeStyle = 'rgba(0, 39, 76, 0.6)';
+                        ctx.lineWidth = 1;
+                    }
                     ctx.stroke();
                 }
             });
@@ -214,12 +222,38 @@
             }
         });
 
+        // Highlight first selected node for connection
+        if (appState.addConnectionMode && appState.firstNodeForConnection) {
+            const p = toScreen(appState.firstNodeForConnection.x, appState.firstNodeForConnection.y);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, nodeRadius + 5, 0, 2 * Math.PI); // Draw a larger circle
+            ctx.strokeStyle = '#FFD700'; // Gold color
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
         if (isSelecting && selectRect) {
             ctx.strokeStyle = 'rgba(255, 203, 5, 0.8)';
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 2]);
             ctx.strokeRect(selectRect.x, selectRect.y, selectRect.w, selectRect.h);
             ctx.setLineDash([]);
+        }
+
+        ctx.restore();
+
+        // Draw temporary connection line
+        if (tempConnection && tempConnection.source && tempConnection.target) {
+            const p1 = toScreen(tempConnection.source.x, tempConnection.source.y);
+            const p2 = toScreen(tempConnection.target.x, tempConnection.target.y);
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = '#FF00FF'; // Magenta color for temporary line
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]); // Dashed line
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset line dash
         }
 
         ctx.restore();
@@ -331,11 +365,14 @@
                     window.selectedNodes = [clickedNode]; // Select the clicked node
                     window.deleteSelected(); // Immediately delete it
                     window.selectedNodes = []; // Clear selection after deletion
-                } else if (appState.addConnectionMode) {
+                } 
+                else if (appState.addConnectionMode) {
                     if (appState.firstNodeForConnection === null) {
                         appState.firstNodeForConnection = clickedNode;
+                        tempConnection = { source: clickedNode, target: null }; // Initialize tempConnection
                         showMessage(`First node selected: ${clickedNode.id}. Click on the second node.`, 'info');
-                    } else {
+                    } 
+                    else {
                         const sourceId = appState.firstNodeForConnection.id;
                         const targetId = clickedNode.id;
 
@@ -351,15 +388,17 @@
                             if (connectionExists) {
                                 showMessage('Connection already exists between these nodes.', 'error');
                             } else {
+                                window.lastEmittedConnection = { source: sourceId, target: targetId }; // Store for highlighting
                                 socket.emit('add_connection', { source: sourceId, target: targetId });
                                 showMessage(`Connection added between ${sourceId} and ${targetId}.`, 'success');
                             }
                         }
-                        appState.addConnectionMode = false; // Exit mode after attempt
+                        // appState.addConnectionMode = false; // Keep mode active for multiple connections
                         appState.firstNodeForConnection = null; // Clear first node
-                        canvas.style.cursor = 'default'; // Reset cursor
+                        // canvas.style.cursor = 'default'; // Keep cursor as crosshair in add connection mode
                     }
-                } else { // Existing selection/drag logic
+                } 
+                else  { // Existing selection/drag logic
                     const isNodeAlreadySelected = selectedNodes.includes(clickedNode);
 
                     if (isCtrlSelecting) { // Ctrl/Cmd click to toggle selection
@@ -389,11 +428,12 @@
                         } else {
                             isDraggingGroup = false; // Single node drag
                         }
-                    } else { // Clicked node was deselected by Ctrl/Cmd click, no drag
-                        draggingNode = null;
-                        isDraggingGroup = false;
                     }
                 }
+                // else { // Clicked node was deselected by Ctrl/Cmd click, no drag
+                //     draggingNode = null;
+                //     isDraggingGroup = false;
+                // }
             } else { // Clicked on empty space
                 if (appState.addNodeMode) {
                     const id = mesh.nodes.length ? Math.max(...mesh.nodes.map(n => n.id)) + 1 : 1;
@@ -463,6 +503,9 @@
                 x: Math.min(selectStart.x, pos.x), y: Math.min(selectStart.y, pos.y),
                 w: Math.abs(pos.x - selectStart.x), h: Math.abs(pos.y - selectStart.y)
             };
+        }
+        else if (appState.addConnectionMode && appState.firstNodeForConnection && tempConnection) {
+            tempConnection.target = toWorld(pos.x, pos.y);
         }
         scheduleDrawMesh();
     }, 16));
@@ -583,4 +626,9 @@
 
     // Expose functions to the global scope
     window.scheduleDrawMesh = scheduleDrawMesh; // scheduleDrawMesh needs to be global for app.js
+    window.centerAndDrawMesh = centerAndDrawMesh; // Expose centerAndDrawMesh globally
+    window.setHighlightedConnection = function(connectionId) {
+        highlightedConnectionId = connectionId;
+        scheduleDrawMesh();
+    };
 })();
