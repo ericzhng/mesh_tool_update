@@ -430,6 +430,7 @@
                         }
                     }
                 }
+                console.log('mousedown: selectedNodes after node click:', window.selectedNodes.map(n => n.id));
                 // else { // Clicked node was deselected by Ctrl/Cmd click, no drag
                 //     draggingNode = null;
                 //     isDraggingGroup = false;
@@ -449,12 +450,14 @@
                     isSelecting = true;
                     selectStart = pos;
                 } else { // Start rect select if not in any special mode
-                    if (!isCtrlSelecting && !isShiftSelecting) {
-                        selectedNodes = []; // Clear selection on empty click if no modifier
+                    // Only clear selection if it's a left click and no modifier keys are pressed
+                    if (e.button === 0 && !isCtrlSelecting && !isShiftSelecting) {
+                        selectedNodes = [];
                     }
                     isSelecting = true;
                     selectStart = pos;
                 }
+                console.log('mousedown: selectedNodes after empty space click:', window.selectedNodes.map(n => n.id));
             }
         }
         else if (e.button === 2) { // Right click
@@ -564,6 +567,7 @@
             } else {
                 selectedNodes = nodesInRect;
             }
+            console.log('mouseup: selectedNodes after selection rectangle:', window.selectedNodes.map(n => n.id));
         }
 
         // Reset all state
@@ -578,6 +582,7 @@
         isShiftSelecting = false;
 
         if (e.button === 2 && !wasDragging && !wasSelecting) { // Show context menu only on simple right click
+            console.log('mouseup: Before showing context menu, selectedNodes:', window.selectedNodes.map(n => n.id));
             showContextMenu(e);
         }
         

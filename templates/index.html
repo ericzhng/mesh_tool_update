@@ -6,6 +6,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
 </head>
 <body class="font-sans overflow-hidden">
     <div id="app-container" class="w-screen h-screen flex flex-col p-4 pb-16 gap-4">
@@ -138,6 +139,11 @@
                 <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
             </svg>
             Home View
+        </a>
+        <div class="border-t border-gray-200 my-1"></div>
+        <a href="#" id="create-triangulation-button" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Creating Delaunay triangulation...', () => createDelaunayTriangulation())">
+            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+            Create Delaunay Triangulation
         </a>
         <div class="border-t border-gray-200 my-1"></div>
         <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Adding node', () => addNode())">

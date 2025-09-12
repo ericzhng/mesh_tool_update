@@ -315,3 +315,55 @@ function toggleCheckboxAndRedraw(checkboxId) {
     }
 }
 window.toggleCheckboxAndRedraw = toggleCheckboxAndRedraw;
+
+function createDelaunayTriangulation() {
+    console.log('createDelaunayTriangulation called. Selected nodes:', window.selectedNodes.map(n => n.id)); // Added console.log
+    if (window.selectedNodes.length < 3) {
+        showMessage('Select at least 3 nodes to create a Delaunay triangulation.', 'error');
+        return;
+    }
+
+    const points = window.selectedNodes.map(node => [node.x, node.y]);
+    const delaunay = Delaunay.from(points);
+
+    const newConnections = [];
+    const existingConnections = new Set(mesh.connections.map(c => {
+        const source = Math.min(c.source, c.target);
+        const target = Math.max(c.source, c.target);
+        return `${source}-${target}`;
+    }));
+
+    let connectionIdCounter = mesh.connections.length > 0 ? Math.max(...mesh.connections.map(c => c.id)) + 1 : 1;
+
+    for (let i = 0; i < points.length; i++) {
+        for (const j of delaunay.neighbors(i)) {
+            const node1 = window.selectedNodes[i];
+            const node2 = window.selectedNodes[j];
+
+            const sourceId = Math.min(node1.id, node2.id);
+            const targetId = Math.max(node1.id, node2.id);
+            const connectionKey = `${sourceId}-${targetId}`;
+
+            if (!existingConnections.has(connectionKey)) {
+                newConnections.push({
+                    id: connectionIdCounter++,
+                    source: node1.id,
+                    target: node2.id
+                });
+                existingConnections.add(connectionKey);
+            }
+        }
+    }
+
+    if (newConnections.length > 0) {
+        socket.emit('add_triangulation_connections', { connections: newConnections });
+        showMessage(`Added ${newConnections.length} new triangulation connections.`, 'success');
+        // Update local mesh immediately for responsiveness
+        mesh.connections.push(...newConnections);
+        scheduleDrawMesh();
+        pushStateToHistory(); // Record this action in history
+    } else {
+        showMessage('No new triangulation connections were generated.', 'info');
+    }
+}
+window.createDelaunayTriangulation = createDelaunayTriangulation;

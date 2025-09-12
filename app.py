@@ -1,6 +1,7 @@
 import os
 import tempfile
 import shutil
+import json
 
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
@@ -127,7 +128,7 @@ def handle_update_nodes_bulk(data):
     node_ids = [n.get("id") for n in data.get("nodes", [])]
     print(f"[DEBUG] update_nodes_bulk SocketIO event received. Node IDs: {node_ids}")
     updated_nodes_data = data.get("nodes", [])
-    is_dragging = data.get("isDragging", False)
+    is_dragging = data.get("isDragging", False);
     dragging_node_id = data.get("draggingNodeId")
 
     # Create a dictionary for quick lookup of nodes by ID
@@ -210,6 +211,16 @@ def handle_delete_connection(data):
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
+@socketio.on("add_triangulation_connections")
+def handle_add_triangulation_connections(data):
+    """Handles a request to add multiple triangulation connections to the mesh."""
+    new_connections = data.get("connections", [])
+    print(f"[DEBUG] add_triangulation_connections SocketIO event received. Adding {len(new_connections)} connections.")
+    mesh["connections"].extend(new_connections)
+    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
+    emit("mesh_summary", get_mesh_summary(), broadcast=True)
+
+
 @socketio.on("clear_mesh")
 def handle_clear_mesh():
     """Handles a request to clear the mesh."""
@@ -241,6 +252,10 @@ def handle_sync_mesh(data):
 def handle_save_mesh():
     """Handles a request to save the mesh to the server."""
     print("[DEBUG] save_mesh SocketIO event received.")
+    save_path = os.path.join(os.getcwd(), 'data', 'saved_mesh.json')
+    with open(save_path, 'w') as f:
+        json.dump(mesh, f, indent=4)
+    print(f"[DEBUG] Mesh saved to {save_path}")
 
 
 @app.route("/export")
