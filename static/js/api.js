@@ -53,6 +53,12 @@ window.showMesh = showMesh;
 
 function clearMesh() {
     if (!appState.meshDisplayed) return showMessage('There is no mesh to clear.', 'error');
+    
+    // Push the current state to history before clearing
+    if (historyManager) {
+        historyManager.pushState();
+    }
+
     socket.emit('clear_mesh');
     appState.meshLoaded = false; // Reset state on clear
     appState.meshDisplayed = false; // Reset state on clear
@@ -72,3 +78,8 @@ function sendBulkNodeUpdate(nodesData, isDragging = false, draggingNodeId = null
     socket.emit('update_nodes_bulk', { nodes: nodesData, isDragging: isDragging, draggingNodeId: draggingNodeId });
 }
 window.sendBulkNodeUpdate = sendBulkNodeUpdate;
+
+function saveMeshToServer() {
+    socket.emit('save_mesh');
+}
+window.saveMeshToServer = saveMeshToServer;

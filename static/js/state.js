@@ -107,6 +107,9 @@ class HistoryManager {
         this.saveToLocalStorage();
         console.log(`State applied. Pointer: ${this.pointer}, History Length: ${this.history.length}`);
         this.updateButtons();
+
+        // After applying the state, sync it with the server
+        socket.emit('sync_mesh', { mesh: this.state.mesh });
     }
 
     saveToLocalStorage() {

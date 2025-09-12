@@ -193,6 +193,7 @@ async function save() {
             await writable.write(blob);
             await writable.close();
             showMessage('Project saved', 'success');
+            saveMeshToServer();
         } catch (err) {
             console.error(err.name, err.message);
             showMessage('Error saving file', 'error');
@@ -246,6 +247,7 @@ async function saveAs() {
             await writable.write(blob);
             await writable.close();
             showMessage('Project saved', 'success');
+            saveMeshToServer();
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.error(err.name, err.message);
@@ -263,6 +265,7 @@ async function saveAs() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showMessage('Project saved', 'success');
+        saveMeshToServer();
     }
 }
 window.saveAs = saveAs;

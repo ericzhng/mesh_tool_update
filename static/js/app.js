@@ -225,6 +225,7 @@ function deleteSelected() {
         socket.emit('delete_nodes_bulk', { ids: nodeIdsToDelete }); // New bulk delete event
         window.selectedNodes = []; // Clear selection after deletion
         showMessage(`Deleted ${nodeIdsToDelete.length} node(s).`, 'success');
+        pushStateToHistory();
     } else {
         showMessage('No nodes selected for deletion.', 'info');
     }
