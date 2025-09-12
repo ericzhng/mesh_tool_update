@@ -7,7 +7,8 @@ let appState = {
     addNodeMode: false, // New state for adding nodes
     addConnectionMode: false, // New state for adding connections
     firstNodeForConnection: null, // Store the first selected node for connection
-    isEditingMode: false, // New state to indicate if any editing mode is active
+    isEditingMode: false, // New state to indicate if any editing mode is active,
+    isNewImport: false, // Flag to indicate a new mesh has been imported
 };
 
 let view = { offsetX: 0, offsetY: 0, scale: 1, rotation: 0, drawPending: false };
@@ -25,6 +26,7 @@ let isSelecting = false;
 let selectStart = null;
 let selectRect = null;
 let projectFileHandle = null;
+let staleFileHandle = null; // For holding handle retrieved from IndexedDB
 
 /**
  * Updates the position of a node in the mesh and spatial grid.

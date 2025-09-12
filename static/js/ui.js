@@ -95,6 +95,7 @@ function updateUndoRedoButtons() {
 
 function newProject() {
     projectFileHandle = null;
+    staleFileHandle = null;
     mesh = { nodes: [], connections: [], elements: [] };
     nodesMap = new Map();
     spatialGrid = null;
@@ -129,6 +130,8 @@ async function openProject() {
                 }],
             });
             projectFileHandle = handle;
+            staleFileHandle = null; // Clear stale handle since we have a new live one
+            storeFileHandle(projectFileHandle); // Store the new handle
             const file = await handle.getFile();
             const contents = await file.text();
             const state = JSON.parse(contents);
@@ -180,6 +183,7 @@ async function openProject() {
 window.openProject = openProject;
 
 async function save() {
+    // Case 1: We have a live handle with permission.
     if (projectFileHandle) {
         const state = historyManager.getCurrentState();
         const dataStr = JSON.stringify(state, null, 2);
@@ -193,9 +197,31 @@ async function save() {
             console.error(err.name, err.message);
             showMessage('Error saving file', 'error');
         }
-    } else {
-        saveAs();
+        return;
     }
+
+    // Case 2: We have a stale handle from IndexedDB, but no permission yet.
+    if (staleFileHandle) {
+        try {
+            const requestStatus = await staleFileHandle.requestPermission({ mode: 'readwrite' });
+            if (requestStatus === 'granted') {
+                projectFileHandle = staleFileHandle; // Promote to live handle
+                staleFileHandle = null; // Clear the stale handle
+                await save(); // Retry the save function, which will now use the live handle
+                return;
+            } else {
+                // User denied permission. Fall through to Save As.
+                staleFileHandle = null; // Discard the stale handle
+            }
+        } catch (err) {
+             if (err.name !== 'AbortError') {
+                console.error('Error requesting permission for stored handle:', err);
+            }
+        }
+    }
+
+    // Case 3: No handle at all, or permission was denied.
+    saveAs();
 }
 window.save = save;
 
@@ -214,6 +240,8 @@ async function saveAs() {
                 }],
             });
             projectFileHandle = handle;
+            staleFileHandle = null; // Clear stale handle since we have a new live one
+            storeFileHandle(projectFileHandle); // Store the new handle
             const writable = await handle.createWritable();
             await writable.write(blob);
             await writable.close();

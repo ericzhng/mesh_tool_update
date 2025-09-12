@@ -52,7 +52,7 @@ socket.on('mesh_data', data => {
 
         appState.meshLoaded = true;
         appState.meshDisplayed = true;
-        if (!isDragging) { // Only show message if not a dragging update
+        if (appState.isNewImport) { // Only show success message on a new import
             showMessage('Mesh loaded successfully.', 'success');
         }
     } else {
@@ -62,11 +62,10 @@ socket.on('mesh_data', data => {
         showMessage('Mesh cleared.', 'success');
     }
 
-    // The following condition would recenter the view after many operations (like node drags)
-    // which is undesirable. The user can recenter manually with the Home button.
-    // if (!isDeleting && !isDragging && !appState.isEditingMode) {
-    //     centerAndDrawMesh(mesh);
-    // }
+    if (appState.isNewImport) {
+        centerAndDrawMesh(mesh);
+        appState.isNewImport = false; // Reset the flag
+    }
     isDeleting = false;
 
     scheduleDrawMesh();
@@ -77,8 +76,16 @@ socket.on('mesh_summary', updateSummary);
 
 // --- INITIALIZATION ---
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
     resizeCanvas();
+
+    console.log('DOM Content Loaded. Retrieving project file handle...');
+    staleFileHandle = await retrieveFileHandle(); // Assign to stale handle
+    console.log('Stale file handle after retrieval:', staleFileHandle);
+    if (staleFileHandle) {
+        // We don't grant permission here, so we just notify the user that we know about the file.
+        showMessage(`Previously saved to: ${staleFileHandle.name}. Click Save to commit changes.`, 'info');
+    }
 
     const state = {
         get mesh() { return mesh; },
