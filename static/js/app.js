@@ -163,6 +163,14 @@ window.addEventListener('DOMContentLoaded', async () => {
             historyManager.pushState();
         });
     }
+
+    // Reset editing modes on page load to ensure a clean state
+    appState.addNodeMode = false;
+    appState.addConnectionMode = false;
+    appState.removeNodeMode = false;
+    appState.isEditingMode = false;
+    appState.firstNodeForConnection = null;
+    updateEditModeIndicator(); // Update the UI to reflect the reset modes
 });
 
 // --- MESH OPERATIONS ---

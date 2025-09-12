@@ -101,7 +101,6 @@ class HistoryManager {
 
         this.state.mesh = stateToApply.mesh;
         this.state.view = stateToApply.view;
-        this.state.appState = stateToApply.appState;
 
         this.callbacks.onStateApplied();
         this.saveToLocalStorage();
@@ -136,7 +135,6 @@ class HistoryManager {
         return {
             mesh: JSON.parse(JSON.stringify(this.state.mesh)),
             view: JSON.parse(JSON.stringify(this.state.view)),
-            appState: JSON.parse(JSON.stringify(this.state.appState)),
         };
     }
 

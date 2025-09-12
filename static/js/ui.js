@@ -135,7 +135,7 @@ async function openProject() {
             const file = await handle.getFile();
             const contents = await file.text();
             const state = JSON.parse(contents);
-            if (state.mesh && state.view && state.appState) {
+            if (state.mesh && state.view) {
                 historyManager.history = [state];
                 historyManager.pointer = 0;
                 historyManager.applyState();
@@ -161,7 +161,7 @@ async function openProject() {
                 reader.onload = e => {
                     try {
                         const state = JSON.parse(e.target.result);
-                        if (state.mesh && state.view && state.appState) {
+                        if (state.mesh && state.view) {
                             historyManager.history = [state];
                             historyManager.pointer = 0;
                             historyManager.applyState();
