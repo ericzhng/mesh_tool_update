@@ -51,9 +51,10 @@ window.showMessage = showMessage;
 
 function updateSummary(summary) {
     const summaryDiv = document.getElementById('summary');
-    summaryDiv.innerHTML = (summary.num_nodes > 0 || summary.num_connections > 0) ? 
-        `Nodes: <strong>${summary.num_nodes}</strong>, Connections: <strong>${summary.num_connections}</strong>` : 'No mesh loaded';
+    summaryDiv.innerHTML = (summary.num_nodes > 0 || summary.num_lines > 0) ? 
+        `Nodes: <strong>${summary.num_nodes}</strong>, Connections: <strong>${summary.num_lines}</strong>` : 'No mesh loaded';
 }
+window.updateSummary = updateSummary;
 
 function triggerFileInput() {
     document.getElementById('mesh-file').click();

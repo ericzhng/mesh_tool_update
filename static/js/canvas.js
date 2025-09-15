@@ -6,8 +6,7 @@
     let isPanning = false;
     let isRotating = false;
     let panStart = { x: 0, y: 0 };
-    let selectedNodes = [];
-    window.selectedNodes = selectedNodes; // Expose selectedNodes globally
+    window.selectedNodes = []; // Expose selectedNodes globally
     let draggingNode = null;
     let dragOffset = { x: 0, y: 0 };
     let isDraggingGroup = false; // New flag for group dragging
@@ -173,8 +172,8 @@
                 ctx.font = '10px sans-serif'; // Reset font
             }
         }
-        else if (mesh.connections && mesh.connections.length > 0) {
-            // Draw connections if no elements are present
+        if (mesh.connections && mesh.connections.length > 0) {
+            // Draw connections
             mesh.connections.forEach(c => {
                 const n1 = nodesMap.get(c.source);
                 const n2 = nodesMap.get(c.target);
@@ -187,7 +186,7 @@
                     ctx.moveTo(p1.x, p1.y);
                     ctx.lineTo(p2.x, p2.y);
                     if (c.id === highlightedConnectionId) {
-                        ctx.strokeStyle = '#FFFF00'; // Yellow for highlighted connection
+                        ctx.strokeStyle = '#00BFFF'; // DeepSkyBlue for highlighted connection
                         ctx.lineWidth = 3;
                     } else {
                         ctx.strokeStyle = 'rgba(0, 39, 76, 0.6)';
@@ -208,8 +207,8 @@
             ctx.arc(p.x, p.y, nodeRadius, 0, 2 * Math.PI);
             
             // Set fill style based on selection
-            if (selectedNodes.includes(n)) {
-                ctx.fillStyle = selectedNodes.length === 1 ? '#00FF00' : '#00FFFF'; // Lime green for single, Cyan for multiple
+            if (window.selectedNodes.includes(n)) {
+                ctx.fillStyle = window.selectedNodes.length === 1 ? '#1E90FF' : '#87CEEB'; // DodgerBlue for single, SkyBlue for multiple
             }
             else {
                 ctx.fillStyle = 'rgba(0, 39, 76, 0.4)'; // Default color
@@ -227,13 +226,13 @@
             const p = toScreen(appState.firstNodeForConnection.x, appState.firstNodeForConnection.y);
             ctx.beginPath();
             ctx.arc(p.x, p.y, nodeRadius + 5, 0, 2 * Math.PI); // Draw a larger circle
-            ctx.strokeStyle = '#FFD700'; // Gold color
+            ctx.strokeStyle = '#4169E1'; // RoyalBlue color
             ctx.lineWidth = 3;
             ctx.stroke();
         }
 
         if (isSelecting && selectRect) {
-            ctx.strokeStyle = 'rgba(255, 203, 5, 0.8)';
+            ctx.strokeStyle = 'rgba(0, 191, 255, 0.5)';
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 2]);
             ctx.strokeRect(selectRect.x, selectRect.y, selectRect.w, selectRect.h);
@@ -329,141 +328,135 @@
         const pos = getMousePos(e);
         hasDragged = false;
 
+        // Find clicked node regardless of button
+        const worldPos = toWorld(pos.x, pos.y);
+        let clickedNode = null;
+        if (spatialGrid) {
+            const clickRadius = 10 / view.scale;
+            const nearbyNodes = spatialGrid.queryPoint(worldPos, clickRadius);
+            let minDistance = Infinity;
+            for (const node of nearbyNodes) {
+                const screenPos = toScreen(node.x, node.y);
+                const distance = Math.hypot(screenPos.x - pos.x, screenPos.y - pos.y);
+                if (distance < 10 && distance < minDistance) {
+                    minDistance = distance;
+                    clickedNode = node;
+                }
+            }
+        }
+
+        isCtrlSelecting = e.ctrlKey || e.metaKey;
+        isShiftSelecting = e.shiftKey;
+
         if (e.button === 1) { // Middle mouse button
             if (e.shiftKey || e.ctrlKey) {
                 isRotating = true;
-            }
-            else {
+            } else {
                 isPanning = true;
             }
             panStart = { x: e.clientX, y: e.clientY };
             canvas.style.cursor = 'grabbing';
         }
         else if (e.button === 0) { // Left click
-            const worldPos = toWorld(pos.x, pos.y);
-            let clickedNode = null;
-            if (spatialGrid) {
-                const clickRadius = 10 / view.scale;
-                const nearbyNodes = spatialGrid.queryPoint(worldPos, clickRadius);
-                let minDistance = Infinity;
-                for (const node of nearbyNodes) {
-                    const screenPos = toScreen(node.x, node.y);
-                    const distance = Math.hypot(screenPos.x - pos.x, screenPos.y - pos.y);
-                    if (distance < 10 && distance < minDistance) {
-                        minDistance = distance;
-                        clickedNode = node;
-                    }
-                }
-            }
-            
-            // Reset selection flags
-            isCtrlSelecting = e.ctrlKey || e.metaKey;
-            isShiftSelecting = e.shiftKey;
-
             if (clickedNode) {
-                if (appState.removeNodeMode) { // New: Remove Node Mode
-                    window.selectedNodes = [clickedNode]; // Select the clicked node
-                    window.deleteSelected(); // Immediately delete it
-                    window.selectedNodes = []; // Clear selection after deletion
-                } 
+                if (appState.removeNodeMode) {
+                    window.selectedNodes = [clickedNode];
+                    window.deleteSelected();
+                    window.selectedNodes = [];
+                }
                 else if (appState.addConnectionMode) {
                     if (appState.firstNodeForConnection === null) {
                         appState.firstNodeForConnection = clickedNode;
-                        tempConnection = { source: clickedNode, target: null }; // Initialize tempConnection
+                        tempConnection = { source: clickedNode, target: null };
                         showMessage(`First node selected: ${clickedNode.id}. Click on the second node.`, 'info');
-                    } 
+                    }
                     else {
-                        const sourceId = appState.firstNodeForConnection.id;
-                        const targetId = clickedNode.id;
-
-                        if (sourceId === targetId) {
-                            showMessage('Cannot connect a node to itself. Select a different node.', 'error');
-                        } else {
-                            // Check for existing connection (both directions)
-                            const connectionExists = mesh.connections.some(conn =>
-                                (conn.source === sourceId && conn.target === targetId) ||
-                                (conn.source === targetId && conn.target === sourceId)
-                            );
-
-                            if (connectionExists) {
-                                showMessage('Connection already exists between these nodes.', 'error');
+                        if (clickedNode) {
+                            const sourceId = appState.firstNodeForConnection.id;
+                            const targetId = clickedNode.id;
+                            if (sourceId === targetId) {
+                                showMessage('Cannot connect a node to itself. Select a different node.', 'error');
                             } else {
-                                window.lastEmittedConnection = { source: sourceId, target: targetId }; // Store for highlighting
-                                socket.emit('add_connection', { source: sourceId, target: targetId });
-                                showMessage(`Connection added between ${sourceId} and ${targetId}.`, 'success');
+                                const connectionExists = mesh.connections.some(conn =>
+                                    (conn.source === sourceId && conn.target === targetId) ||
+                                    (conn.source === targetId && conn.target === sourceId)
+                                );
+                                if (connectionExists) {
+                                    showMessage('Connection already exists between these nodes.', 'error');
+                                } else {
+                                    window.lastEmittedConnection = { source: sourceId, target: targetId };
+                                    socket.emit('add_connection', { source: sourceId, target: targetId });
+                                    showMessage(`Connection added between ${sourceId} and ${targetId}.`, 'success');
+                                }
                             }
                         }
-                        // appState.addConnectionMode = false; // Keep mode active for multiple connections
-                        appState.firstNodeForConnection = null; // Clear first node
-                        // canvas.style.cursor = 'default'; // Keep cursor as crosshair in add connection mode
+                        appState.firstNodeForConnection = null;
+                        tempConnection = null; // Also reset tempConnection
                     }
-                } 
-                else  { // Existing selection/drag logic
-                    const isNodeAlreadySelected = selectedNodes.includes(clickedNode);
-
-                    if (isCtrlSelecting) { // Ctrl/Cmd click to toggle selection
-                        const index = selectedNodes.indexOf(clickedNode);
+                }
+                else { // Existing selection/drag logic
+                    const isNodeAlreadySelected = window.selectedNodes.includes(clickedNode);
+                    if (isCtrlSelecting) {
+                        const index = window.selectedNodes.indexOf(clickedNode);
                         if (index > -1) {
-                            selectedNodes.splice(index, 1); // Remove if already selected
+                            window.selectedNodes.splice(index, 1);
                         } else {
-                            selectedNodes.push(clickedNode); // Add if not selected
+                            window.selectedNodes.push(clickedNode);
                         }
-                    } else if (isShiftSelecting) { // Shift click to add to selection
+                    } else if (isShiftSelecting) {
                         if (!isNodeAlreadySelected) {
-                            selectedNodes.push(clickedNode);
+                            window.selectedNodes.push(clickedNode);
                         }
-                    } else { // No modifier key
-                        if (!isNodeAlreadySelected) { // If clicked node is not selected, clear selection and select it
-                            selectedNodes = [clickedNode];
+                    } else {
+                        if (!isNodeAlreadySelected) {
+                            window.selectedNodes = [clickedNode];
                         }
-                        // If clicked node is already selected, we assume the user wants to drag the group
-                        // No change to selectedNodes, proceed to dragging logic
                     }
 
-                    if (selectedNodes.includes(clickedNode)) { // If the clicked node is now part of the selection (either single or group)
-                        draggingNode = clickedNode; // The node that initiated the drag
+                    if (window.selectedNodes.includes(clickedNode)) {
+                        draggingNode = clickedNode;
                         dragOffset = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
-                        if (selectedNodes.length > 1 && isNodeAlreadySelected && !isCtrlSelecting && !isShiftSelecting) {
-                            isDraggingGroup = true; // Flag for group drag
+                        if (window.selectedNodes.length > 1 && isNodeAlreadySelected && !isCtrlSelecting && !isShiftSelecting) {
+                            isDraggingGroup = true;
                         } else {
-                            isDraggingGroup = false; // Single node drag
+                            isDraggingGroup = false;
                         }
                     }
                 }
-                console.log('mousedown: selectedNodes after node click:', window.selectedNodes.map(n => n.id));
-                // else { // Clicked node was deselected by Ctrl/Cmd click, no drag
-                //     draggingNode = null;
-                //     isDraggingGroup = false;
-                // }
             } else { // Clicked on empty space
                 if (appState.addNodeMode) {
                     const id = mesh.nodes.length ? Math.max(...mesh.nodes.map(n => n.id)) + 1 : 1;
                     socket.emit('add_node', { id, x: worldPos.x, y: worldPos.y });
                     showMessage('Node added.', 'success');
                     pushStateToHistory();
-                } else if (appState.addConnectionMode) { // If in add connection mode and clicked empty space, cancel
+                } else if (appState.addConnectionMode) {
                     appState.addConnectionMode = false;
                     appState.firstNodeForConnection = null;
                     canvas.style.cursor = 'default';
                     showMessage('Add Connection mode cancelled.', 'info');
-                } else if (appState.removeNodeMode) { // New: Start rect select for removal
+                } else if (appState.removeNodeMode) {
                     isSelecting = true;
                     selectStart = pos;
-                } else { // Start rect select if not in any special mode
-                    // Only clear selection if it's a left click and no modifier keys are pressed
-                    if (e.button === 0 && !isCtrlSelecting && !isShiftSelecting) {
-                        selectedNodes = [];
+                } else {
+                    if (e.button !== 2 && !isCtrlSelecting && !isShiftSelecting) { // Only clear for left-click
+                        window.selectedNodes = [];
                     }
                     isSelecting = true;
                     selectStart = pos;
                 }
-                console.log('mousedown: selectedNodes after empty space click:', window.selectedNodes.map(n => n.id));
             }
         }
         else if (e.button === 2) { // Right click
-            // No drag detection here, context menu will be shown on mouseup if not dragging
-            isRotating = false; // Ensure rotation is off for context menu click
-            isPanning = false; // Ensure panning is off
+            if (clickedNode) {
+                const isNodeAlreadySelected = window.selectedNodes.includes(clickedNode);
+                if (!isNodeAlreadySelected && !isShiftSelecting && !isCtrlSelecting) {
+                    window.selectedNodes = [clickedNode];
+                } else if (isShiftSelecting && !isNodeAlreadySelected) {
+                    window.selectedNodes.push(clickedNode);
+                }
+            }
+            isRotating = false;
+            isPanning = false;
         }
         scheduleDrawMesh();
     });
@@ -489,7 +482,7 @@
             if (isDraggingGroup) {
                 const deltaX = (worldPos.x + dragOffset.x) - draggingNode.x;
                 const deltaY = (worldPos.y + dragOffset.y) - draggingNode.y;
-                selectedNodes.forEach(node => {
+                window.selectedNodes.forEach(node => {
                     const newX = node.x + deltaX;
                     const newY = node.y + deltaY;
                     window.updateNodePosition(node.id, newX, newY); // Update local state only
@@ -508,7 +501,27 @@
             };
         }
         else if (appState.addConnectionMode && appState.firstNodeForConnection && tempConnection) {
-            tempConnection.target = toWorld(pos.x, pos.y);
+            const worldPos = toWorld(pos.x, pos.y);
+            let snappedNode = null;
+            if (spatialGrid) {
+                const snapRadius = 10 / view.scale;
+                const nearbyNodes = spatialGrid.queryPoint(worldPos, snapRadius);
+                let minDistance = Infinity;
+                for (const node of nearbyNodes) {
+                    const screenPos = toScreen(node.x, node.y);
+                    const distance = Math.hypot(screenPos.x - pos.x, screenPos.y - pos.y);
+                    if (distance < 10 && distance < minDistance) {
+                        minDistance = distance;
+                        snappedNode = node;
+                    }
+                }
+            }
+
+            if (snappedNode) {
+                tempConnection.target = snappedNode;
+            } else {
+                tempConnection.target = toWorld(pos.x, pos.y);
+            }
         }
         scheduleDrawMesh();
     }, 16));
@@ -522,7 +535,7 @@
             
             // Send final positions to the server after drag ends
             if (isDraggingGroup) {
-                const updatedNodes = selectedNodes.map(node => ({ id: node.id, x: node.x, y: node.y }));
+                const updatedNodes = window.selectedNodes.map(node => ({ id: node.id, x: node.x, y: node.y }));
                 window.sendBulkNodeUpdate(updatedNodes, false, null); // Final update, not dragging anymore
             } else if (draggingNode) {
                 socket.emit('update_node', { id: draggingNode.id, x: draggingNode.x, y: draggingNode.y, isDragging: false, draggingNodeId: null });
@@ -552,20 +565,20 @@
             });
             if (appState.removeNodeMode) { // New: If in remove node mode, delete selected nodes
                 if (nodesInRect.length > 0) {
-                    window.selectedNodes = nodesInRect; // Temporarily set selectedNodes for deleteSelected
+                    window.selectedNodes = nodesInRect; // Temporarily set window.selectedNodes for deleteSelected
                     window.deleteSelected();
                     window.selectedNodes = []; // Clear selection after deletion
                 }
             } else if (isCtrlSelecting) {
-                const currentSelection = new Set(selectedNodes);
+                const currentSelection = new Set(window.selectedNodes);
                 nodesInRect.forEach(node => { currentSelection.delete(node); });
-                selectedNodes = Array.from(currentSelection);
+                window.selectedNodes = Array.from(currentSelection);
             } else if (isShiftSelecting) {
-                const currentSelection = new Set(selectedNodes);
+                const currentSelection = new Set(window.selectedNodes);
                 nodesInRect.forEach(node => { currentSelection.add(node); });
-                selectedNodes = Array.from(currentSelection);
+                window.selectedNodes = Array.from(currentSelection);
             } else {
-                selectedNodes = nodesInRect;
+                window.selectedNodes = nodesInRect;
             }
             console.log('mouseup: selectedNodes after selection rectangle:', window.selectedNodes.map(n => n.id));
         }
@@ -608,7 +621,7 @@
 
     window.addEventListener('keydown', e => {
         if (e.key === 'Delete' || e.key === 'Backspace') { // Check for Delete or Backspace key
-            if (selectedNodes.length > 0) {
+            if (window.selectedNodes.length > 0) {
                 e.preventDefault(); // Prevent default browser behavior (e.g., navigating back)
                 window.deleteSelected(); // Call the delete function
             }
@@ -631,7 +644,7 @@
 
     // Expose functions to the global scope
     window.scheduleDrawMesh = scheduleDrawMesh; // scheduleDrawMesh needs to be global for app.js
-    window.centerAndDrawMesh = centerAndDrawMesh; // Expose centerAndDrawMesh globally
+    
     window.setHighlightedConnection = function(connectionId) {
         highlightedConnectionId = connectionId;
         scheduleDrawMesh();

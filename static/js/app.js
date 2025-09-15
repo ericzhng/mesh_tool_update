@@ -82,10 +82,10 @@ socket.on('mesh_data', data => {
     }
 
     scheduleDrawMesh();
-    updateSummary(); // Removed argument
+    window.updateSummary({ num_nodes: mesh.nodes.length, num_lines: mesh.connections.length, num_elements: mesh.elements.length });
 });
 
-socket.on('mesh_summary', updateSummary);
+socket.on('mesh_summary', window.updateSummary);
 
 // --- INITIALIZATION ---
 
@@ -130,7 +130,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 spatialGrid = null;
             }
             scheduleDrawMesh();
-            updateSummary();
+            window.updateSummary({ num_nodes: mesh.nodes.length, num_lines: mesh.connections.length, num_elements: mesh.elements.length });
             // console.log("onStateApplied callback finished. Mesh after rebuild:", mesh);
         },
         onHistoryChange: () => {
@@ -172,7 +172,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 appState.meshDisplayed = false;
             }
             centerAndDrawMesh(mesh); // Always call after initial load
-            updateSummary();
+            window.updateSummary({ num_nodes: mesh.nodes.length, num_lines: mesh.connections.length, num_elements: mesh.elements.length });
             historyManager.pushState();
         });
     }
@@ -278,13 +278,6 @@ function removeConnection() {
 }
 window.removeConnection = removeConnection;
 
-function updateSummary() { // Removed argument
-    const summaryDiv = document.getElementById('summary');
-    summaryDiv.innerHTML = (mesh.nodes.length > 0 || mesh.connections.length > 0 || mesh.elements.length > 0) ? 
-        `Nodes: <strong>${mesh.nodes.length}</strong>, Lines: <strong>${mesh.connections.length}</strong>, Elements: <strong>${mesh.elements.length}</strong>` : 'No mesh loaded';
-}
-window.updateSummary = updateSummary;
-
 // --- EVENT LISTENERS ---
 
 document.getElementById('mesh-file').addEventListener('change', function() {
@@ -324,7 +317,7 @@ function createDelaunayTriangulation() {
     }
 
     const points = window.selectedNodes.map(node => [node.x, node.y]);
-    const delaunay = Delaunay.from(points);
+    const delaunay = d3.Delaunay.from(points);
 
     const newConnections = [];
     const existingConnections = new Set(mesh.connections.map(c => {
@@ -359,8 +352,8 @@ function createDelaunayTriangulation() {
         socket.emit('add_triangulation_connections', { connections: newConnections });
         showMessage(`Added ${newConnections.length} new triangulation connections.`, 'success');
         // Update local mesh immediately for responsiveness
-        mesh.connections.push(...newConnections);
-        scheduleDrawMesh();
+        // mesh.connections.push(...newConnections);
+        // scheduleDrawMesh();
         pushStateToHistory(); // Record this action in history
     } else {
         showMessage('No new triangulation connections were generated.', 'info');
