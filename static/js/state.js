@@ -6,6 +6,7 @@ let appState = {
     meshDisplayed: false,
     addNodeMode: false, // New state for adding nodes
     addConnectionMode: false, // New state for adding connections
+    removeConnectionMode: false, // New state for removing connections
     firstNodeForConnection: null, // Store the first selected node for connection
     isEditingMode: false, // New state to indicate if any editing mode is active,
     isNewImport: false, // Flag to indicate a new mesh has been imported

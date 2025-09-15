@@ -78,26 +78,61 @@
         return { x: sx * cosR - sy * sinR, y: sx * sinR + sy * cosR };
     }
 
-    function getCentroid(node_ids) {
-        let centerX = 0;
-        let centerY = 0;
-        const numNodes = node_ids.length;
+    function distToSegmentSquared(p, p1, p2) {
+        const l2 = (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y);
+        if (l2 === 0) return (p.x - p1.x) * (p.x - p1.x) + (p.y - p1.y) * (p.y - p1.y);
+        let t = ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        const projectionX = p1.x + t * (p2.x - p1.x);
+        const projectionY = p1.y + t * (p2.y - p1.y);
+        return (p.x - projectionX) * (p.x - projectionX) + (p.y - projectionY) * (p.y - projectionY);
+    }
 
-        node_ids.forEach(nodeId => {
-            const node = nodesMap.get(nodeId);
+    function isPointNearLineSegment(point, p1, p2, tolerance) {
+        const distance = Math.sqrt(distToSegmentSquared(point, p1, p2));
+        // console.log(`  Distance to segment: ${distance}, Tolerance: ${tolerance}`);
+        return distance <= tolerance;
+    }
+
+    function findConnectionsNearPoint(point, tolerance) {
+        const nearbyConnectionsWithDistance = [];
+        mesh.connections.forEach(c => {
+            const n1 = nodesMap.get(c.source);
+            const n2 = nodesMap.get(c.target);
+            if (n1 && n2) {
+                const p1 = toScreen(n1.x, n1.y);
+                const p2 = toScreen(n2.x, n2.y);
+                const distance = Math.sqrt(distToSegmentSquared(point, p1, p2));
+                if (distance <= tolerance) {
+                    nearbyConnectionsWithDistance.push({ connection: c, distance: distance });
+                }
+            }
+        });
+        return nearbyConnectionsWithDistance;
+    }
+
+    function getCentroid(nodeIds) {
+        if (!nodeIds || nodeIds.length === 0) {
+            return { x: 0, y: 0 };
+        }
+
+        let sumX = 0;
+        let sumY = 0;
+        nodeIds.forEach(id => {
+            const node = nodesMap.get(id);
             if (node) {
-                centerX += node.x;
-                centerY += node.y;
+                sumX += node.x;
+                sumY += node.y;
             }
         });
 
-        return { x: centerX / numNodes, y: centerY / numNodes };
+        return { x: sumX / nodeIds.length, y: sumY / nodeIds.length };
     }
 
     window.rotateView = function(angle) { // Exposed globally
         const rect = canvas.getBoundingClientRect();
         const centerScreen = { x: rect.width / 2, y: rect.height / 2 };
-        const centerWorldOld = toWorld(centerScreen.x, centerScreen.y);
+        const centerWorldOld = toWorld(centerScreen.x, centerWorld.y);
 
         view.rotation += angle;
 
@@ -394,6 +429,25 @@
                         tempConnection = null; // Also reset tempConnection
                     }
                 }
+                else if (appState.removeConnectionMode) { // New: Remove Connection Mode
+                    console.log('Remove Connection Mode: Click position (screen):', pos);
+                    const tolerance = 15; // Increased tolerance for easier clicking
+                    const nearbyConnectionsWithDistance = findConnectionsNearPoint(pos, tolerance);
+                    console.log('Remove Connection Mode: Nearby connections found (with distance):', nearbyConnectionsWithDistance);
+
+                    if (nearbyConnectionsWithDistance.length > 0) {
+                        // Sort by distance to find the closest one
+                        nearbyConnectionsWithDistance.sort((a, b) => a.distance - b.distance);
+                        const closestConnection = nearbyConnectionsWithDistance[0].connection;
+                        
+                        console.log('Remove Connection Mode: Deleting closest connection:', closestConnection);
+                        socket.emit('delete_connection', { source: closestConnection.source, target: closestConnection.target });
+                        showMessage(`Connection between ${closestConnection.source} and ${closestConnection.target} removed.`, 'success');
+                        pushStateToHistory();
+                    } else {
+                        showMessage('No connection found near click.', 'info');
+                    }
+                }
                 else { // Existing selection/drag logic
                     const isNodeAlreadySelected = window.selectedNodes.includes(clickedNode);
                     if (isCtrlSelecting) {
@@ -628,9 +682,10 @@
         } else if (e.key === 'Enter') { // Check for Enter key
             if (appState.isEditingMode) {
                 e.preventDefault(); // Prevent default browser behavior
-                                appState.addNodeMode = false;
+                appState.addNodeMode = false;
                 appState.addConnectionMode = false;
                 appState.removeNodeMode = false; // New: Exit remove node mode
+                appState.removeConnectionMode = false; // Fix: Exit remove connection mode
                 appState.firstNodeForConnection = null;
                 appState.isEditingMode = false;
                 

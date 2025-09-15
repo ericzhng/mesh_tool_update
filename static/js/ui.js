@@ -111,7 +111,7 @@ function newProject() {
         historyManager.pushState();
     }
     scheduleDrawMesh();
-    updateSummary();
+    updateSummary({ num_nodes: 0, num_lines: 0, num_elements: 0 });
     showMessage('New project started', 'success');
 }
 window.newProject = newProject;

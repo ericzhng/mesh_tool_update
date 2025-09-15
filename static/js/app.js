@@ -204,6 +204,10 @@ function updateEditModeIndicator() {
         indicator.textContent = 'Remove Node Mode | Select nodes to remove | Press Enter to Exit';
         indicator.classList.remove('hidden');
         canvas.style.cursor = 'crosshair';
+    } else if (appState.removeConnectionMode) { // New: Remove Connection Mode
+        indicator.textContent = 'Remove Connection Mode | Click on a connection to remove it | Press Enter to Exit';
+        indicator.classList.remove('hidden');
+        canvas.style.cursor = 'crosshair';
     } else {
         indicator.classList.add('hidden');
         canvas.style.cursor = 'default';
@@ -273,8 +277,20 @@ function addConnection() {
 window.addConnection = addConnection;
 
 function removeConnection() {
-    // Placeholder for remove connection functionality
-    showMessage('Remove Connection functionality not yet implemented.', 'info');
+    appState.removeConnectionMode = !appState.removeConnectionMode;
+    appState.isEditingMode = appState.removeConnectionMode;
+
+    if (appState.removeConnectionMode) {
+        appState.addNodeMode = false;
+        appState.addConnectionMode = false;
+        appState.removeNodeMode = false; // Ensure other modes are off
+        appState.firstNodeForConnection = null;
+        showMessage('Remove Connection Mode | Click on a connection to remove it | Press Enter to Exit', 'info');
+    } else {
+        showMessage('Exited Remove Connection Mode', 'info');
+    }
+    window.selectedNodes = []; // Clear selection when entering/exiting remove mode
+    updateEditModeIndicator();
 }
 window.removeConnection = removeConnection;
 
