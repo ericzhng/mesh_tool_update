@@ -2,6 +2,7 @@ import os
 import csv
 import json
 import re
+import meshio
 
 
 def read_abaqus_inp(filepath):
@@ -15,8 +16,10 @@ def read_abaqus_inp(filepath):
         dict: A dictionary containing the mesh nodes, connections (edges), and elements.
     """
     nodes = []
-    elements = [] # New list for 2D elements
-    connections = [] # This will store edges derived from elements, and explicit 1D connections
+    elements = []  # New list for 2D elements
+    connections = (
+        []
+    )  # This will store edges derived from elements, and explicit 1D connections
 
     with open(filepath, "r") as f:
         lines = f.readlines()
@@ -57,8 +60,13 @@ def read_abaqus_inp(filepath):
                     target_node = node_ids[(i + 1) % len(node_ids)]
                     # Add connection only if it's not a duplicate (for 2D elements)
                     # A more robust solution might involve sorting (min, max) for the pair
-                    if {"source": target_node, "target": source_node} not in connections:
-                        connections.append({"source": source_node, "target": target_node})
+                    if {
+                        "source": target_node,
+                        "target": source_node,
+                    } not in connections:
+                        connections.append(
+                            {"source": source_node, "target": target_node}
+                        )
     return {"nodes": nodes, "connections": connections, "elements": elements}
 
 
@@ -152,6 +160,7 @@ def read_mesh(filepath):
     else:
         raise ValueError(f"Unsupported mesh file format: {ext}")
 
+
 def write_abaqus_inp(filepath, mesh_data):
     """
     Writes mesh data to an Abaqus input file (.inp).
@@ -167,7 +176,9 @@ def write_abaqus_inp(filepath, mesh_data):
             f.write(f"{node['id']}, {node['x']:.6f}, {node['y']:.6f}\n")
 
         if mesh_data["elements"]:
-            f.write("*ELEMENT, TYPE=S2\n") # Assuming S2 for 2-node elements, adjust as needed
+            f.write(
+                "*ELEMENT, TYPE=S2\n"
+            )  # Assuming S2 for 2-node elements, adjust as needed
             for elem in mesh_data["elements"]:
                 node_ids_str = ", ".join(map(str, elem["node_ids"]))
                 f.write(f"{elem['id']}, {node_ids_str}\n")
