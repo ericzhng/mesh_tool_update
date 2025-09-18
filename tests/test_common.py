@@ -3,6 +3,7 @@ import numpy as np
 from abaqus_io import _common
 import io
 import contextlib
+from unittest.mock import patch, mock_open
 
 
 class TestCommon(unittest.TestCase):
@@ -45,12 +46,14 @@ class TestCommon(unittest.TestCase):
 
         self.assertTrue(
             np.array_equal(
-                flattened_data["data1"], np.array([10, 11, 12, 13, 14, 15, 16, 17, 18])
+                flattened_data["data1"],
+                np.array([10, 11, 12, 13, 14, 15, 16, 17, 18]),
             )
         )
         self.assertTrue(
             np.array_equal(
-                flattened_data["data2"], np.array([20, 21, 22, 23, 24, 25, 26, 27, 28])
+                flattened_data["data2"],
+                np.array([20, 21, 22, 23, 24, 25, 26, 27, 28]),
             )
         )
 
@@ -120,6 +123,21 @@ class TestLoggingFunctions(unittest.TestCase):
         s = f.getvalue()
         self.assertIn("Debug", s)
         self.assertIn("test message", s)
+
+
+class TestReadConfig(unittest.TestCase):
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="---\nC3D8:\n  dim: 3\n  nodes: 8\n",
+    )
+    @patch("yaml.safe_load")
+    def test_read_config(self, mock_yaml_load, mock_open_file):
+        mock_yaml_load.return_value = {"C3D8": {"dim": 3, "nodes": 8}}
+        config = _common.read_config()
+        self.assertIn("C3D8", config)
+        self.assertEqual(config["C3D8"]["dim"], 3)
+        self.assertEqual(config["C3D8"]["nodes"], 8)
 
 
 if __name__ == "__main__":

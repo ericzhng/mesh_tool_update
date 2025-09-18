@@ -31,11 +31,16 @@ class TestElementBlock(unittest.TestCase):
                     [3, 4, 5, 6, 7, 8, 9, 10],
                 ],
             )  # Unsupported element type
+        with self.assertRaises(ValueError):
+            ElementBlock(
+                "CGAX3", [1, 2], [[1, 2], [3, 4]]
+            ) # Mismatch in number of nodes
 
     def test_repr(self):
         block = ElementBlock("CGAX3", [1, 2], [[1, 2, 3], [2, 3, 4]])
         self.assertEqual(
-            repr(block), "<ElementBlock: CGAX3, dim=2, #nodes=3, num_elements=2>"
+            repr(block),
+            "<ElementBlock: CGAX3, dim=2, #nodes_per_cell=3, #elements=2>",
         )
 
     def test_len(self):
