@@ -1,0 +1,157 @@
+from __future__ import annotations
+
+import copy
+from collections import defaultdict
+
+import numpy as np
+from numpy.typing import ArrayLike
+
+from .element_block import ElementBlock
+
+
+class Mesh:
+    """
+    A class to hold mesh data, such as nodes, elements, and sets.
+
+    This class provides a structured way to store and manipulate mesh data read
+    from file formats like the Abaqus input deck. It organizes data into
+    points (nodes), cells (elements), and various sets and data arrays
+    associated with them.
+
+    Attributes
+    ----------
+    points : np.ndarray
+        A 2D array of node coordinates, with shape (num_points, 3).
+    cells : list[ElementBlock]
+        A list of ElementBlock objects, each representing a block of elements
+        of the same type.
+    node_sets : dict[str, np.ndarray]
+        A dictionary mapping set names to 1D arrays of 0-based node indices.
+    elem_sets : dict[str, list[np.ndarray]]
+        A dictionary mapping set names to lists of 1D arrays of 0-based
+        element indices. The list structure mirrors the `cells` attribute.
+    surface_sets : dict[str, list[np.ndarray]]
+        Similar to `elem_sets`, but for surfaces defined by element faces.
+    point_ids : dict[str, np.ndarray]
+        A dictionary mapping data array names to 1D arrays of data associated
+        with each point.
+    cell_ids : dict[str, np.ndarray]
+        A dictionary mapping data array names to lists of arrays of data
+        associated with each cell, mirroring the `cells` structure.
+    """
+
+    def __init__(
+        self,
+        points: list[np.ndarray],
+        point_ids: list[list],
+        cells: list[ElementBlock],
+        node_sets: dict[str, list] | None = None,
+        elem_sets: dict[str, list] | None = None,
+        surface_sets: dict[str, list] | None = None,
+    ):
+        # convert point info into a single array or list
+        self.points = np.concatenate(points)
+        self.point_ids = [item for sublist in point_ids for item in sublist]
+
+        self.cells = cells
+
+        self.node_sets = node_sets or {}
+        self.elem_sets = elem_sets or {}
+        self.surface_sets = surface_sets or {}
+
+        self._validate_data()
+
+    def _validate_data(self):
+        """
+        Validates the consistency of nodes, elements, and their associated data.
+
+        Raises
+        ------
+        ValueError
+            If any inconsistency is found in the data.
+        TypeError
+            If any data has an incorrect type.
+        """
+        # Validate points
+        if not isinstance(self.points, np.ndarray) or self.points.ndim != 2:
+            raise TypeError("Points (coordinates) must be a 2D NumPy array.")
+
+        # Validate point_ids
+        if not isinstance(self.point_ids, list):
+            raise TypeError("Point data must be a list.")
+        if len(self.point_ids) != len(self.points):
+            raise ValueError(
+                f"Point ids has length {len(self.point_ids)}, but there are {len(self.points)} points."
+            )
+
+        # Validate cells
+        if not isinstance(self.cells, list):
+            raise TypeError("Cells (elements) must be a list of ElementBlock objects.")
+        for i, block in enumerate(self.cells):
+            if not isinstance(block, ElementBlock):
+                raise TypeError(f"Element at index {i} is not an ElementBlock object.")
+        # formulate a single cell id list
+        whole_element_ids = []
+        for block in self.cells:
+            whole_element_ids.extend(block.ids)
+
+        # Validate node_sets
+        if not isinstance(self.node_sets, dict):
+            raise TypeError("Node sets must be a dictionary.")
+        for name, nodes_in_set in self.node_sets.items():
+            nodes_in_set = np.asarray(nodes_in_set)
+            if not set(self.point_ids).issuperset(set(nodes_in_set)):
+                raise ValueError(
+                    f"Node IDs in set '{name}' are out of bounds for points array (size {len(self.points)})."
+                )
+
+        # Validate elem_sets
+        if not isinstance(self.elem_sets, dict):
+            raise TypeError("Element sets must be a dictionary.")
+        for name, blocks_in_set in self.elem_sets.items():
+            if not isinstance(blocks_in_set, list):
+                raise TypeError(f"Element set '{name}' must be a list.")
+            if not set(whole_element_ids).issuperset(set(blocks_in_set)):
+                raise ValueError(
+                    f"Element IDs in set '{name}' are out of bounds for cell ids."
+                )
+
+        # Validate surface_sets (similar to element_sets)
+        if not isinstance(self.surface_sets, dict):
+            raise TypeError("Surface sets must be a dictionary.")
+
+    def __repr__(self) -> str:
+        """Returns a summary of the Mesh data."""
+        total_size = len(self.point_ids)
+
+        lines = [
+            f"<Mesh with {len(self.points)} points and {len(self.cells)} cell blocks>",
+            "  Cell blocks:",
+            *[
+                f"    - {block.element_type}: {len(block)} elements"
+                for block in self.cells
+            ],
+            f"  # Points: {total_size}",
+            f"  # Node Sets: {len(self.node_sets)}",
+            f"  # Element Sets: {len(self.elem_sets)}",
+            f"  # Surface Sets: {len(self.surface_sets)}",
+        ]
+        return "\n".join(lines)
+
+    def copy(self) -> Mesh:
+        """Returns a deep copy of the object."""
+        return copy.deepcopy(self)
+
+    def write(self, path_or_buf: str, **kwargs):
+        """Writes the Abaqus input deck to a file."""
+        # Lazy import to avoid circular dependency if write_deck needs Mesh
+        from .deck_write import write_deck
+
+        write_deck(path_or_buf, self, **kwargs)
+
+    @classmethod
+    def from_file(cls, path_or_buf: str) -> Mesh:
+        """Reads Abaqus input deck data from a file."""
+        from .deck_read import read_deck
+
+        return read_deck(path_or_buf)

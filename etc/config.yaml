@@ -1,0 +1,14 @@
+---
+# element information
+
+SFMGAX1:
+  dim: 1
+  nodes: 2
+
+CGAX3:
+  dim: 2
+  nodes: 3
+
+CGAX4:
+  dim: 2
+  nodes: 4

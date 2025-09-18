@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from rich.console import Console
 import numpy as np
+import yaml
+import os
 
 # ==============================================================================
 # Data Manipulation Functions
@@ -46,7 +48,7 @@ def unflatten_cell_data(flat_cell_data, block_counts):
             )
 
     # Get the indices where to split the arrays
-    split_indices = np.cumsum(block_counts)[:-1]
+    split_indices = np.cumsum(block_counts, dtype=np.int32)[:-1]
     return {
         data_name: np.split(flat_data_array, split_indices)
         for data_name, flat_data_array in flat_cell_data.items()
@@ -201,3 +203,18 @@ def replace_spaces_with_char(input_string: str) -> tuple[str, str]:
         if char not in input_string:
             return input_string.replace(" ", char), char
     raise ValueError("Could not find a suitable character to replace spaces.")
+
+
+# ==============================================================================
+# YAML parsing
+# ==============================================================================
+
+
+def read_config():
+    """
+    Reads the config.yaml file and returns the supported element types and dims.
+    """
+    config_path = os.path.join(os.path.dirname(__file__), "..", "etc", "config.yaml")
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    return config
