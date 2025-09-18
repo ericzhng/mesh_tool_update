@@ -1,10 +1,7 @@
 from __future__ import annotations
-
 import copy
-from collections import defaultdict
 
 import numpy as np
-from numpy.typing import ArrayLike
 
 from .element_block import ElementBlock
 
@@ -128,7 +125,7 @@ class Mesh:
             f"<Mesh with {len(self.points)} points and {len(self.cells)} cell blocks>",
             "  Cell blocks:",
             *[
-                f"    - {block.element_type}: {len(block)} elements"
+                f"    - # {block.element_type} elements: {len(block)} "
                 for block in self.cells
             ],
             f"  # Points: {total_size}",
@@ -141,17 +138,3 @@ class Mesh:
     def copy(self) -> Mesh:
         """Returns a deep copy of the object."""
         return copy.deepcopy(self)
-
-    def write(self, path_or_buf: str, **kwargs):
-        """Writes the Abaqus input deck to a file."""
-        # Lazy import to avoid circular dependency if write_deck needs Mesh
-        from .deck_write import write_deck
-
-        write_deck(path_or_buf, self, **kwargs)
-
-    @classmethod
-    def from_file(cls, path_or_buf: str) -> Mesh:
-        """Reads Abaqus input deck data from a file."""
-        from .deck_read import read_deck
-
-        return read_deck(path_or_buf)

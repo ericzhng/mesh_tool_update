@@ -111,6 +111,9 @@ def _read_buffer(f):
                 else:
                     surf_sets[name] = set_names
 
+        else:
+            line = f.readline()
+
     # Parse node sets defined in NODE
     for name in node_sets_in_node.keys():
         if name in node_sets.keys():
