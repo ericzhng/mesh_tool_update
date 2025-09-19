@@ -186,17 +186,6 @@ def _read_cells(f, options_map: dict, point_ids: list[list]):
                 f"but got {len(node_ids)}: {node_ids}"
             )
 
-        if point_ids:
-            # concatenate the list to an full array
-            point_ids_total = np.concatenate(point_ids)
-            point_ids_set = set(point_ids_total.tolist())
-            # check if node_ids are not defined in points_id
-            if not set(node_ids).issubset(point_ids_set):
-                undefined_nodes = set(node_ids) - point_ids_set
-                raise ValueError(
-                    f"Element {elem_id} references undefined node IDs: {', '.join(map(str, undefined_nodes))}"
-                )
-
         cell_ids.append(elem_id)
         cell_nodes.append(node_ids)
 

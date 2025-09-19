@@ -3,6 +3,7 @@ This module contains common utility functions used across the abaqus_io package.
 """
 
 from __future__ import annotations
+from collections import defaultdict
 
 from rich.console import Console
 import numpy as np
@@ -78,6 +79,32 @@ def flatten_cell_data(structured_cell_data):
         data_name: np.concatenate(data_arrays)
         for data_name, data_arrays in structured_cell_data.items()
     }
+
+
+def find_common_values_with_indices(input_list: list) -> dict:
+    """
+    Finds common values in a list and returns a dictionary
+    mapping each common value to a list of its indices.
+
+    Args:
+        input_list: The list to check for common values.
+
+    Returns:
+        A dictionary with common values as keys and a list of their
+        indices as values.
+    """
+    indices_map = defaultdict(list)
+    common_values = {}
+
+    for index, value in enumerate(input_list):
+        indices_map[value].append(index)
+
+    # Filter for values that appear more than once
+    for value, indices in indices_map.items():
+        if len(indices) > 1:
+            common_values[value] = indices
+
+    return common_values
 
 
 # ==============================================================================

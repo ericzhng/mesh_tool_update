@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import ArrayLike
 
-from ._common import read_config
+from ._common import find_common_values_with_indices, read_config
 
 # Load configuration once at the module level
 _config = read_config()
@@ -112,4 +112,19 @@ class ElementBlock:
 
         ids = np.concatenate([b.ids for b in blocks])
         connectivity = np.concatenate([b.connectivity for b in blocks])
+        return cls(element_type, ids, connectivity)
+
+    @classmethod
+    def unique_cat(cls, blocks: list[ElementBlock]) -> list[ElementBlock]:
+        """Concatenates a list of ElementBlock objects."""
+        if not blocks:
+            return [cls.empty()]
+
+        # find within blocks matched element_type
+        input_list = [b.element_type for b in blocks]
+        common_dict = find_common_values_with_indices(input_list)
+
+        ids = np.concatenate([b.ids for b in blocks])
+        connectivity = np.concatenate([b.connectivity for b in blocks])
+
         return cls(element_type, ids, connectivity)

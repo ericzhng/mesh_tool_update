@@ -39,16 +39,17 @@ class Mesh:
 
     def __init__(
         self,
-        points: list[np.ndarray],
-        point_ids: list[list],
+        points: np.ndarray,
+        point_ids: list[int],
         cells: list[ElementBlock],
         node_sets: dict[str, list] | None = None,
         elem_sets: dict[str, list] | None = None,
         surface_sets: dict[str, list] | None = None,
+        validate_flag: bool = True,
     ):
-        # convert point info into a single array or list
-        self.points = np.concatenate(points)
-        self.point_ids = [item for sublist in point_ids for item in sublist]
+        # assign points directly (already a NumPy array)
+        self.points = points
+        self.point_ids = point_ids
 
         self.cells = cells
 
@@ -56,7 +57,8 @@ class Mesh:
         self.elem_sets = elem_sets or {}
         self.surface_sets = surface_sets or {}
 
-        self._validate_data()
+        if validate_flag:
+            self._validate_data()
 
     def _validate_data(self):
         """
