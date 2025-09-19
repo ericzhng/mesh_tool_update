@@ -1,4 +1,3 @@
-
 import os
 import tempfile
 import shutil
@@ -7,7 +6,7 @@ import json
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
-from meshtool import abaqusIO
+import trunk.abaqus_io as abaqusIO
 
 
 app = Flask(__name__)
@@ -82,7 +81,7 @@ def load_mesh():
             print(f"[ERROR] Failed to parse mesh from {filepath}: {e}")
             return f"Failed to parse mesh: {e}", 400
         finally:
-            shutil.rmtree(temp_dir) # Clean up the temporary directory
+            shutil.rmtree(temp_dir)  # Clean up the temporary directory
         return "Mesh loaded", 200
     return "Invalid file", 400
 
@@ -167,7 +166,7 @@ def handle_update_nodes_bulk(data):
             updated_data = nodes_to_update_map[n["id"]]
             n["x"] = updated_data["x"]
             n["y"] = updated_data["y"]
-    
+
     if not is_dragging:
         _save_mesh()
 
@@ -254,7 +253,9 @@ def handle_delete_connection(data):
 def handle_add_triangulation_connections(data):
     """Handles a request to add multiple triangulation connections to the mesh."""
     new_connections = data.get("connections", [])
-    print(f"[DEBUG] add_triangulation_connections SocketIO event received. Adding {len(new_connections)} connections.")
+    print(
+        f"[DEBUG] add_triangulation_connections SocketIO event received. Adding {len(new_connections)} connections."
+    )
     mesh["connections"].extend(new_connections)
     _save_mesh()
     emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
@@ -306,4 +307,3 @@ def export_connectivity():
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, port=5050)
-
