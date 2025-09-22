@@ -6,42 +6,60 @@ import json
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
-import trunk.abaqus_io as abaqusIO
+
+from abaqus_io import read_deck, write_deck, Mesh
 
 
 app = Flask(__name__)
 socketio = SocketIO(app)
 
 # Initialize mesh with data from saved_mesh.json if it exists
-mesh = {"nodes": [], "connections": [], "elements": []}
-save_path = os.path.join(os.getcwd(), "data", "saved_mesh.json")
+mesh = {
+    "points": [],
+    "point_ids": [],
+    "elements": {},
+    "node_sets": {},
+    "element_sets": {},
+    "surface_sets": {},
+}
+
+save_path = os.path.join(os.getcwd(), "temp", "saved_mesh.json")
 if os.path.exists(save_path):
     with open(save_path, "r") as f:
         mesh = json.load(f)
         print(f"[DEBUG] Initial mesh loaded from {save_path}")
 
 
-ALLOWED_EXTENSIONS = {"inp", "deck"}
-
-
 def allowed_file(filename):
     """Checks if a file has an allowed extension."""
+    ALLOWED_EXTENSIONS = {"inp", "deck"}
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def get_mesh_summary():
     """Returns a summary of the current mesh."""
+    print("[DEBUG] get_mesh_summary called.")
+    if not mesh:
+        return {"num_nodes": 0, "num_elements": 0}
+
+    total_elements = 0
+    for element_type, elements in mesh.get("elements", {}).items():
+        print(f"[DEBUG] Element type: {element_type}, Count: {len(elements)}")
+        total_elements += len(elements)
+
     return {
-        "num_nodes": len(mesh["nodes"]),
-        "num_lines": len(mesh["connections"]),
-        "num_elements": len(mesh["elements"]),
+        "# nodes": len(mesh["points"]),
+        "# elements": total_elements,
+        "# node_sets": len(mesh["node_sets"].keys()),
+        "# element_sets": len(mesh["element_sets"].keys()),
+        "# surface_sets": len(mesh["surface_sets"].keys()),
     }
 
 
 def _save_mesh():
     """Saves the current mesh state to the JSON file."""
     print("[DEBUG] _save_mesh called.")
-    save_path = os.path.join(os.getcwd(), "data", "saved_mesh.json")
+    save_path = os.path.join(os.getcwd(), "temp", "saved_mesh.json")
     try:
         with open(save_path, "w") as f:
             json.dump(mesh, f, indent=4)
@@ -71,11 +89,12 @@ def load_mesh():
         filepath = os.path.join(temp_dir, filename)
         file.save(filepath)
         try:
-            mesh_data = abaqusIO.read_mesh(filepath)
-            mesh["nodes"] = mesh_data["nodes"]
-            mesh["connections"] = mesh_data["connections"]
+            mesh_data = read_deck(filepath)
+            mesh["nodes"] = mesh_data.points.tolist()
+
             mesh["elements"] = mesh_data.get("elements", [])
             _save_mesh()
+
             print(f"[DEBUG] Mesh loaded from uploaded file: {filepath}")
         except Exception as e:
             print(f"[ERROR] Failed to parse mesh from {filepath}: {e}")
