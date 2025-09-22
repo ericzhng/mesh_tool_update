@@ -19,3 +19,40 @@ function debounce(func, delay) {
         timeout = setTimeout(() => func.apply(context, args), delay);
     };
 }
+
+async function saveFile(content, filename, contentType) {
+    const blob = new Blob([content], { type: contentType });
+
+    if (window.showSaveFilePicker) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: filename,
+                types: [{
+                    description: 'Text Files',
+                    accept: { [contentType]: ['.deck', '.txt'] },
+                }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            showMessage('File saved successfully', 'success');
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error(err.name, err.message);
+                showMessage('Error saving file', 'error');
+            }
+        }
+    } else {
+        // Fallback for older browsers
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showMessage('File saved successfully', 'success');
+    }
+}
+window.saveFile = saveFile;

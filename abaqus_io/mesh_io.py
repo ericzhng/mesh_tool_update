@@ -73,8 +73,8 @@ class Mesh:
             If any data has an incorrect type.
         """
         # Validate points
-        if not isinstance(self.points, np.ndarray) or self.points.ndim != 2:
-            raise TypeError("Points (coordinates) must be a 2D NumPy array.")
+        if not isinstance(self.points, np.ndarray):
+            raise TypeError("Points (coordinates) must be a NumPy array.")
 
         # Validate point_ids
         if not isinstance(self.point_ids, list):

@@ -2,32 +2,112 @@ import os
 import tempfile
 import shutil
 import json
+import io
+import numpy as np
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
 
-from abaqus_io import read_deck, write_deck, Mesh
-
+from abaqus_io import read_deck, write_deck, Mesh, ElementBlock
 
 app = Flask(__name__)
 socketio = SocketIO(app)
 
-# Initialize mesh with data from saved_mesh.json if it exists
-mesh = {
-    "points": [],
-    "point_ids": [],
-    "elements": {},
-    "node_sets": {},
-    "element_sets": {},
-    "surface_sets": {},
-}
+# Global variable to hold the mesh object
+mesh: Mesh | None = None
+# Global variable to hold connections for frontend visualization
+connections: list = []
 
-save_path = os.path.join(os.getcwd(), "temp", "saved_mesh.json")
-if os.path.exists(save_path):
-    with open(save_path, "r") as f:
-        mesh = json.load(f)
-        print(f"[DEBUG] Initial mesh loaded from {save_path}")
+
+# Path for storing information about the last used mesh file
+MESH_INFO_PATH = os.path.join(os.getcwd(), "temp", "mesh_info.json")
+TEMP_MESH_DIR = os.path.join(os.getcwd(), "temp", "mesh_files")
+
+# Ensure the temporary directories exist
+os.makedirs(os.path.dirname(MESH_INFO_PATH), exist_ok=True)
+os.makedirs(TEMP_MESH_DIR, exist_ok=True)
+
+
+def mesh_to_dict(mesh_obj: Mesh | None):
+    """Converts a Mesh object to a JSON-serializable dictionary."""
+    if not mesh_obj:
+        return {}
+
+    nodes = [
+        {"id": int(pid), "x": p[0], "y": p[1], "z": p[2]}
+        for pid, p in zip(mesh_obj.point_ids, mesh_obj.points)
+    ]
+
+    elements = []
+    for cell_block in mesh_obj.cells:
+        for i, element_id in enumerate(cell_block.ids):
+            elements.append(
+                {
+                    "id": int(element_id),
+                    "type": cell_block.element_type,
+                    "node_ids": cell_block.connectivity[i].tolist(),
+                }
+            )
+
+    return {
+        "nodes": nodes,
+        "cells": elements,
+        "node_sets": mesh_obj.node_sets,
+        "element_sets": mesh_obj.elem_sets,
+        "surface_sets": mesh_obj.surface_sets,
+    }
+
+
+def dict_to_mesh(mesh_dict: dict):
+    """Converts a dictionary to a Mesh object."""
+    if not mesh_dict:
+        return None
+
+    nodes = mesh_dict.get("nodes", [])
+    points = np.array([[n["x"], n["y"], n["z"]] for n in nodes])
+    point_ids = [n["id"] for n in nodes]
+
+    # Group elements by type to create ElementBlocks
+    elements_by_type = {}
+    for element in mesh_dict.get("cells", []):
+        el_type = element["type"]
+        if el_type not in elements_by_type:
+            elements_by_type[el_type] = {"ids": [], "connectivity": []}
+        elements_by_type[el_type]["ids"].append(element["id"])
+        elements_by_type[el_type]["connectivity"].append(element["node_ids"])
+
+    cells = []
+    for el_type, data in elements_by_type.items():
+        cells.append(
+            ElementBlock(
+                element_type=el_type,
+                ids=np.array(data["ids"]),
+                connectivity=np.array(data["connectivity"]),
+            )
+        )
+
+    return Mesh(
+        points=points,
+        point_ids=point_ids,
+        cells=cells,
+        node_sets=mesh_dict.get("node_sets", {}),
+        elem_sets=mesh_dict.get("element_sets", {}),
+        surface_sets=mesh_dict.get("surface_sets", {}),
+    )
+
+
+# Load the last used mesh on startup
+if os.path.exists(MESH_INFO_PATH):
+    try:
+        with open(MESH_INFO_PATH, "r") as f:
+            mesh_info = json.load(f)
+            mesh_filepath = mesh_info.get("filepath")
+            if mesh_filepath and os.path.exists(mesh_filepath):
+                print(f"[DEBUG] Loading initial mesh from {mesh_filepath}")
+                mesh = read_deck(mesh_filepath)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"[ERROR] Failed to load initial mesh info: {e}")
 
 
 def allowed_file(filename):
@@ -42,30 +122,15 @@ def get_mesh_summary():
     if not mesh:
         return {"num_nodes": 0, "num_elements": 0}
 
-    total_elements = 0
-    for element_type, elements in mesh.get("elements", {}).items():
-        print(f"[DEBUG] Element type: {element_type}, Count: {len(elements)}")
-        total_elements += len(elements)
+    total_elements = sum(len(block.ids) for block in mesh.cells)
 
     return {
-        "# nodes": len(mesh["points"]),
+        "# nodes": len(mesh.points),
         "# elements": total_elements,
-        "# node_sets": len(mesh["node_sets"].keys()),
-        "# element_sets": len(mesh["element_sets"].keys()),
-        "# surface_sets": len(mesh["surface_sets"].keys()),
+        "# node_sets": len(mesh.node_sets),
+        "# element_sets": len(mesh.elem_sets),
+        "# surface_sets": len(mesh.surface_sets),
     }
-
-
-def _save_mesh():
-    """Saves the current mesh state to the JSON file."""
-    print("[DEBUG] _save_mesh called.")
-    save_path = os.path.join(os.getcwd(), "temp", "saved_mesh.json")
-    try:
-        with open(save_path, "w") as f:
-            json.dump(mesh, f, indent=4)
-        print(f"[DEBUG] Mesh auto-saved to {save_path}")
-    except Exception as e:
-        print(f"[ERROR] Failed to auto-save mesh: {e}")
 
 
 @app.route("/")
@@ -77,6 +142,7 @@ def index():
 @app.route("/load", methods=["POST"])
 def load_mesh():
     """Loads a mesh from a file."""
+    global mesh
     print("[DEBUG] /load endpoint called")
     if "file" not in request.files:
         return "No file part", 400
@@ -85,113 +151,132 @@ def load_mesh():
         return "No selected file", 400
     if file and file.filename and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        temp_dir = tempfile.mkdtemp()
-        filepath = os.path.join(temp_dir, filename)
+        filepath = os.path.join(TEMP_MESH_DIR, filename)
         file.save(filepath)
         try:
-            mesh_data = read_deck(filepath)
-            mesh["nodes"] = mesh_data.points.tolist()
-
-            mesh["elements"] = mesh_data.get("elements", [])
-            _save_mesh()
-
+            mesh = read_deck(filepath)
+            # Save the path for persistence
+            with open(MESH_INFO_PATH, "w") as f:
+                json.dump({"filepath": filepath}, f)
             print(f"[DEBUG] Mesh loaded from uploaded file: {filepath}")
         except Exception as e:
             print(f"[ERROR] Failed to parse mesh from {filepath}: {e}")
             return f"Failed to parse mesh: {e}", 400
-        finally:
-            shutil.rmtree(temp_dir)  # Clean up the temporary directory
         return "Mesh loaded", 200
     return "Invalid file", 400
 
 
+@app.route("/export")
+def export_mesh():
+    """Exports the current mesh and returns it as a file download."""
+    print("[DEBUG] /export endpoint called.")
+    if not mesh:
+        return "No mesh to export", 400
+
+    try:
+        # Use an in-memory text buffer to write the deck content
+        deck_buffer = io.StringIO()
+        write_deck(deck_buffer, mesh)
+        deck_content = deck_buffer.getvalue()
+        deck_buffer.close()
+
+        print(f"[DEBUG] Mesh exported to in-memory buffer")
+
+        # Return the content as a downloadable file
+        return Response(
+            deck_content,
+            mimetype="text/plain",
+            headers={"Content-Disposition": "attachment;filename=mesh.deck"},
+        )
+
+    except Exception as e:
+        print(f"[ERROR] Failed to export mesh: {e}")
+        return f"Failed to export mesh: {e}", 500
+
+
 @app.route("/last_mesh")
 def last_mesh():
-    """Returns the last loaded."""
+    """Returns the last loaded mesh."""
     print("[DEBUG] /last_mesh endpoint called. Returning current mesh state.")
-    return jsonify(mesh)
+    return jsonify(mesh_to_dict(mesh))
 
 
 @socketio.on("get_mesh")
 def handle_get_mesh(data=None):
     """Handles a request to get the current mesh."""
     print("[DEBUG] get_mesh SocketIO event received.")
-    emit("mesh_data", {"mesh": mesh, "isDragging": False})
+    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False})
 
 
 @socketio.on("add_node")
 def handle_add_node(data):
     """Handles a request to add a node to the mesh."""
+    global mesh
+    if not mesh:
+        return
+
     print(f"[DEBUG] add_node SocketIO event received. Node ID: {data.get('id')}")
-    mesh["nodes"].append(data)
-    _save_mesh()
-    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
+    new_point_id = data.get("id")
+    new_point_coords = [data.get("x", 0), data.get("y", 0), 0]  # Assuming 2D for now
+
+    mesh.points = np.vstack([mesh.points, new_point_coords])
+    mesh.point_ids.append(new_point_id)
+
+    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
 @socketio.on("delete_node")
 def handle_delete_node(data):
     """Handles a request to delete a node from the mesh."""
-    node_id = data["id"]
-    print(f"[DEBUG] delete_node SocketIO event received. Node ID: {node_id}")
-    mesh["nodes"] = [n for n in mesh["nodes"] if n["id"] != node_id]
-    mesh["connections"] = [
-        c
-        for c in mesh["connections"]
-        if c["source"] != node_id and c["target"] != node_id
-    ]
-    _save_mesh()
-    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
+    global mesh
+    if not mesh:
+        return
+
+    node_id_to_delete = data["id"]
+    print(f"[DEBUG] delete_node SocketIO event received. Node ID: {node_id_to_delete}")
+
+    try:
+        node_index = mesh.point_ids.index(node_id_to_delete)
+        mesh.points = np.delete(mesh.points, node_index, axis=0)
+        mesh.point_ids.pop(node_index)
+
+        # Also remove node from any node sets
+        for name, ids in mesh.node_sets.items():
+            mesh.node_sets[name] = [i for i in ids if i != node_id_to_delete]
+
+    except ValueError:
+        print(f"[WARNING] Node with ID {node_id_to_delete} not found for deletion.")
+
+    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
 @socketio.on("update_node")
 def handle_update_node(data):
     """Handles a request to update a node in the mesh."""
-    print(f"[DEBUG] update_node SocketIO event received. Node ID: {data.get('id')}")
-    for n in mesh["nodes"]:
-        if n["id"] == data["id"]:
-            n["x"] = data["x"]
-            n["y"] = data["y"]
-    is_dragging = data.get("isDragging", False)
-    dragging_node_id = data.get("draggingNodeId")
-    if not is_dragging:
-        _save_mesh()
+    if not mesh:
+        return
 
-    emit(
-        "mesh_data",
-        {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id},
-        broadcast=True,
-    )
-    emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    node_id = data["id"]
+    print(f"[DEBUG] update_node SocketIO event received. Node ID: {node_id}")
 
+    try:
+        node_index = mesh.point_ids.index(node_id)
+        mesh.points[node_index] = [data["x"], data["y"], 0]  # Assuming 2D
+    except ValueError:
+        print(f"[WARNING] Node with ID {node_id} not found for update.")
 
-@socketio.on("update_nodes_bulk")
-def handle_update_nodes_bulk(data):
-    """Handles a request to update multiple nodes in the mesh."""
-    node_ids = [n.get("id") for n in data.get("nodes", [])]
-    print(f"[DEBUG] update_nodes_bulk SocketIO event received. Node IDs: {node_ids}")
-    updated_nodes_data = data.get("nodes", [])
     is_dragging = data.get("isDragging", False)
     dragging_node_id = data.get("draggingNodeId")
 
-    # Create a dictionary for quick lookup of nodes by ID
-    nodes_to_update_map = {
-        node_data["id"]: node_data for node_data in updated_nodes_data
-    }
-
-    for n in mesh["nodes"]:
-        if n["id"] in nodes_to_update_map:
-            updated_data = nodes_to_update_map[n["id"]]
-            n["x"] = updated_data["x"]
-            n["y"] = updated_data["y"]
-
-    if not is_dragging:
-        _save_mesh()
-
     emit(
         "mesh_data",
-        {"mesh": mesh, "isDragging": is_dragging, "draggingNodeId": dragging_node_id},
+        {
+            "mesh": mesh_to_dict(mesh),
+            "isDragging": is_dragging,
+            "draggingNodeId": dragging_node_id,
+        },
         broadcast=True,
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
@@ -200,128 +285,137 @@ def handle_update_nodes_bulk(data):
 @socketio.on("delete_nodes_bulk")
 def handle_delete_nodes_bulk(data):
     """Handles a request to delete multiple nodes from the mesh."""
+    global mesh, connections
+    if not mesh:
+        return
+
     node_ids_to_delete = set(data.get("ids", []))
     print(
         f"[DEBUG] delete_nodes_bulk SocketIO event received. Node IDs to delete: {list(node_ids_to_delete)}"
     )
 
-    # Filter out deleted nodes
-    mesh["nodes"] = [n for n in mesh["nodes"] if n["id"] not in node_ids_to_delete]
+    # Find indices of nodes to delete
+    indices_to_delete = [
+        i for i, pid in enumerate(mesh.point_ids) if pid in node_ids_to_delete
+    ]
+
+    # Remove nodes and point_ids
+    mesh.points = np.delete(mesh.points, indices_to_delete, axis=0)
+    mesh.point_ids = [pid for pid in mesh.point_ids if pid not in node_ids_to_delete]
+
+    # Remove nodes from node sets
+    for name, ids in mesh.node_sets.items():
+        mesh.node_sets[name] = [i for i in ids if i not in node_ids_to_delete]
+
+    # Remove elements connected to the deleted nodes
+    for cell_block in mesh.cells:
+        mask = np.isin(
+            cell_block.connectivity, list(node_ids_to_delete), invert=True
+        ).all(axis=1)
+        cell_block.connectivity = cell_block.connectivity[mask]
+        cell_block.ids = cell_block.ids[mask]
 
     # Filter out connections involving deleted nodes
-    mesh["connections"] = [
+    connections = [
         c
-        for c in mesh["connections"]
+        for c in connections
         if c["source"] not in node_ids_to_delete
         and c["target"] not in node_ids_to_delete
     ]
 
-    # Filter out elements involving deleted nodes
-    mesh["elements"] = [
-        e
-        for e in mesh["elements"]
-        if not any(node_id in node_ids_to_delete for node_id in e["node_ids"])
-    ]
-    _save_mesh()
-
-    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
+    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
 @socketio.on("add_connection")
 def handle_add_connection(data):
     """Handles a request to add a connection to the mesh."""
+    global connections
     print(
         f"[DEBUG] add_connection SocketIO event received. Source: {data.get('source')}, Target: {data.get('target')}"
     )
-    # Generate a unique ID for the new connection
-    new_id = (
-        max([c.get("id") or 0 for c in mesh["connections"]]) + 1
-        if mesh["connections"]
-        else 1
-    )
+    new_id = max([c.get("id") or 0 for c in connections]) + 1 if connections else 1
     data["id"] = new_id
-    mesh["connections"].append(data)
-    _save_mesh()  # Auto-save after modification
+    connections.append(data)
 
-    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
+    emit(
+        "mesh_data",
+        {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False},
+        broadcast=True,
+    )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
 @socketio.on("delete_connection")
 def handle_delete_connection(data):
     """Handles a request to delete a connection from the mesh."""
+    global connections
     print(
         f"[DEBUG] delete_connection SocketIO event received. Source: {data.get('source')}, Target: {data.get('target')}"
     )
-    # Remove both directions for undirected mesh
-    mesh["connections"] = [
+    connections = [
         c
-        for c in mesh["connections"]
+        for c in connections
         if not (
             (c["source"] == data["source"] and c["target"] == data["target"])
             or (c["source"] == data["target"] and c["target"] == data["source"])
         )
     ]
-    _save_mesh()
-    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
+    emit(
+        "mesh_data",
+        {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False},
+        broadcast=True,
+    )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
 @socketio.on("add_triangulation_connections")
 def handle_add_triangulation_connections(data):
     """Handles a request to add multiple triangulation connections to the mesh."""
+    global connections
     new_connections = data.get("connections", [])
     print(
         f"[DEBUG] add_triangulation_connections SocketIO event received. Adding {len(new_connections)} connections."
     )
-    mesh["connections"].extend(new_connections)
-    _save_mesh()
-    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
+    connections.extend(new_connections)
+    emit(
+        "mesh_data",
+        {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False},
+        broadcast=True,
+    )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
 @socketio.on("clear_mesh")
 def handle_clear_mesh():
     """Handles a request to clear the mesh."""
+    global mesh, connections
     print("[DEBUG] clear_mesh SocketIO event received.")
-    mesh["nodes"] = []
-    mesh["connections"] = []
-    mesh["elements"] = []
-    _save_mesh()
-    emit("mesh_data", {"mesh": mesh, "isDragging": False}, broadcast=True)
+    mesh = None
+    connections = []
+    emit(
+        "mesh_data",
+        {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False},
+        broadcast=True,
+    )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
 
 
 @socketio.on("sync_mesh")
 def handle_sync_mesh(data):
     """Handles a request to sync the mesh from a client."""
+    global mesh, connections
     print("[DEBUG] sync_mesh SocketIO event received.")
-    global mesh
-    mesh = data.get("mesh", {"nodes": [], "connections": [], "elements": []})
-    _save_mesh()
+    mesh = dict_to_mesh(data.get("mesh"))
+    connections = data.get("connections", [])
     # Broadcast the synced mesh to all clients except the sender
     emit(
         "mesh_data",
-        {"mesh": mesh, "isDragging": False},
+        {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False},
         broadcast=True,
         include_self=False,
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
-
-
-@socketio.on("save_mesh")
-def handle_save_mesh():
-    """Handles a request to save the mesh to the server."""
-    print("[DEBUG] save_mesh SocketIO event received.")
-    _save_mesh()
-
-
-@app.route("/export")
-def export_connectivity():
-    """Exports the connectivity matrix of the mesh."""
-    print("[DEBUG] /export endpoint called.")
-    return jsonify(mesh["connections"])
 
 
 if __name__ == "__main__":

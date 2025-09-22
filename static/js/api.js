@@ -65,14 +65,25 @@ function clearMesh() {
 }
 window.clearMesh = clearMesh;
 
-function exportMatrix() {
+function exportMesh() {
     if (!appState.meshDisplayed) return showMessage('Please load and show a mesh before exporting.', 'error');
-    fetch('/export').then(r => r.json()).then(data => {
-        console.log(data);
-        showMessage('Connectivity matrix logged to the console.', 'info');
-    });
+
+    fetch('/export')
+        .then(response => {
+            if (response.ok) {
+                return response.text();
+            } else {
+                throw new Error('Failed to export mesh.');
+            }
+        })
+        .then(content => {
+            saveFile(content, 'mesh.deck', 'text/plain');
+        })
+        .catch(err => {
+            showMessage(err.message, 'error');
+        });
 }
-window.exportMatrix = exportMatrix;
+window.exportMesh = exportMesh;
 
 function sendBulkNodeUpdate(nodesData, isDragging = false, draggingNodeId = null) {
     socket.emit('update_nodes_bulk', { nodes: nodesData, isDragging: isDragging, draggingNodeId: draggingNodeId });

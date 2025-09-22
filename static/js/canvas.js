@@ -132,7 +132,7 @@
     window.rotateView = function(angle) { // Exposed globally
         const rect = canvas.getBoundingClientRect();
         const centerScreen = { x: rect.width / 2, y: rect.height / 2 };
-        const centerWorldOld = toWorld(centerScreen.x, centerWorld.y);
+        const centerWorldOld = toWorld(centerScreen.x, centerScreen.y);
 
         view.rotation += angle;
 
