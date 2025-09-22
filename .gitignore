@@ -67,3 +67,4 @@ ENV/
 # Mac
 .DS_Store
 data/mesh_data.json
+temp/*
