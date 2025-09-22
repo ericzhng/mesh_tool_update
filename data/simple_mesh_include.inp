@@ -1,17 +1,18 @@
 *Node,NSET=Extra
-5, 2.0, 0.0, 1.0
-6, 3.0, 0.0, 1.0
+	5, 2.0, 0.0, 1.0
+	6, 3.0, 0.0, 1.0
+	7, 2.0, 0.0, 1.0
+	8, 3.0, 0.0, 1.0
 *Element, type=CGAX3
-3, 5, 2, 3
-4, 6, 3, 4
-*ELSET, ELSET=bc1
-     1,     2
-*ELSET, ELSET=bc2
-     3,     4
+	5, 5, 2, 3
+	8, 6, 3, 4
+*ELSET, ELSET=elem_set1
+     11,     2
+*ELSET, ELSET=elem_set2
+     5,     8
 *SURFACE, NAME=surf1, TYPE=ELEMENT
- bc1
+	elem_set1
 *SURFACE, NAME=surf2, TYPE=ELEMENT
- bc2
+	elem_set2
 *NSET, NSET=top
-  1, 2, 4, 5
-  
+	1, 2, 4, 5
