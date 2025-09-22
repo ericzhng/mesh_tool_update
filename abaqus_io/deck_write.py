@@ -19,9 +19,10 @@ def write_deck(filename, mesh: Mesh, comment_line: str = "") -> None:
         f.write("**  NODE DEFINITION\n")
 
         f.write("*NODE\n")
-        for k, xyz in enumerate(mesh.points):
+        for k, xyz_id in enumerate(zip(mesh.points, mesh.point_ids)):
+            xyz, id = xyz_id[0], xyz_id[1]
             str_coords = ", ".join(f"{entry:10.6f}" for entry in xyz)
-            output = f"{k+1:9}, {str_coords}\n"
+            output = f"{id:9}, {str_coords}\n"
             f.write(output)
 
         f.write("**--end--node--definition\n")
@@ -82,7 +83,7 @@ def write_deck(filename, mesh: Mesh, comment_line: str = "") -> None:
                 output = "\n".join(
                     func_node_line(ids[i : i + 2]) for i in range(0, len(ids), 2)
                 )
-                f.write(output + "\n")
+                f.write(" " + output + "\n")
                 f.write("**" + "-" * 78 + "\n")
 
         f.flush()

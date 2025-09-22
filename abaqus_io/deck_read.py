@@ -2,11 +2,11 @@
 I/O for Abaqus inp files.
 """
 
+import itertools
 from pathlib import Path
 from typing import List
 
 import numpy as np
-from numpy.typing import ArrayLike
 
 from abaqus_io.mesh_io import Mesh
 from .element_block import ElementBlock
@@ -22,7 +22,7 @@ def read_deck(filename, validate_flag: bool = True):
 def _read_buffer(f, validate_flag: bool = True):
     # Initialize data fields, later to combine together
     points: list[np.ndarray] = []
-    point_ids: list[list] = []
+    point_ids: list[list[int]] = []
 
     cells: List[ElementBlock] = []
 
@@ -34,6 +34,7 @@ def _read_buffer(f, validate_flag: bool = True):
     node_sets_in_node = {}  # Handle cell sets defined in NODE
     cell_sets_in_element = {}  # Handle cell sets defined in ELEMENT
 
+    # for externally included deck in the current deck
     mesh_ext = None
 
     # start parsing data
@@ -119,18 +120,12 @@ def _read_buffer(f, validate_flag: bool = True):
             if not ext_input_file.exists():
                 raise IOError(f"INCLUDE deck file does not exist {str(ext_input_file)}")
 
-            mesh_ext = read_deck(ext_input_file, False)
+            mesh_ext = read_deck(ext_input_file, validate_flag=False)
             line = f.readline()
 
         else:
             line = f.readline()
-
-    # Parse node sets defined in NODE
-    for name in node_sets_in_node.keys():
-        if name in node_sets.keys():
-            node_sets[name].extend(node_sets_in_node[name])
-        else:
-            node_sets[name] = node_sets_in_node[name]
+    # ---- END OF PARSING ----
 
     # Parse cell sets defined in ELEMENT
     for name in cell_sets_in_element.keys():
@@ -138,42 +133,43 @@ def _read_buffer(f, validate_flag: bool = True):
             elem_sets[name].extend(cell_sets_in_element[name])
         else:
             elem_sets[name] = cell_sets_in_element[name]
+    cell_sets_in_element.clear()
+
+    # Parse node sets defined in NODE
+    for name in node_sets_in_node.keys():
+        if name in node_sets.keys():
+            node_sets[name].extend(node_sets_in_node[name])
+        else:
+            node_sets[name] = node_sets_in_node[name]
+    node_sets_in_node.clear()
+
+    # concatenate the list to an full array
+    points_total = np.concatenate(points)
+    point_ids_total = list(itertools.chain.from_iterable(point_ids))
 
     if mesh_ext is not None:
-        points, point_ids, cells, node_sets, elem_sets, surf_sets = _merge(
-            points,
-            point_ids,
+        _mesh = _merge(
+            points_total,
+            point_ids_total,
             cells,
             node_sets,
             elem_sets,
             surf_sets,
             mesh_ext,
+            validate_flag,
+        )
+    else:
+        _mesh = Mesh(
+            points_total,
+            point_ids_total,
+            cells,
+            node_sets,
+            elem_sets,
+            surf_sets,
+            validate_flag,
         )
 
-    # # move the checking to the Mesh class validate function
-    # if point_ids:
-    #     # concatenate the list to an full array
-    #     point_ids_total = np.concatenate(point_ids)
-    #     point_ids_set = set(point_ids_total.tolist())
-    #     # check if node_ids are not defined in points_id
-    #     if not set(node_ids).issubset(point_ids_set):
-    #         undefined_nodes = set(node_ids) - point_ids_set
-    #         raise ValueError(
-    #             f"Element {elem_id} references undefined node IDs: {', '.join(map(str, undefined_nodes))}"
-    #         )
-
-    point_coords = np.concatenate(points)
-    point_ids_total = [item for sublist in point_ids for item in sublist]
-
-    return Mesh(
-        point_coords,
-        point_ids_total,
-        cells,
-        node_sets,
-        elem_sets,
-        surf_sets,
-        validate_flag,
-    )
+    return _mesh
 
 
 def _merge(
@@ -184,12 +180,14 @@ def _merge(
     elem_sets,
     surf_sets,
     mesh_ext: Mesh,
+    validate_flag: bool = True,
 ):
-    """Merge existing variables with external mesh object."""
-    points_update = np.concatenate(points + [mesh_ext.points])
-    point_ids_total = np.concatenate(point_ids + [mesh_ext.point_ids])
+    """Merge existing mesh object with external mesh object."""
 
-    cells.cat(mesh_ext.cells)
+    points_total = np.concatenate([points, mesh_ext.points])
+    point_ids_total = point_ids + mesh_ext.point_ids
+
+    cells_total = ElementBlock.unique_cat(cells + mesh_ext.cells)
 
     for name, val in mesh_ext.node_sets.items():
         if name in node_sets.keys():
@@ -209,4 +207,12 @@ def _merge(
         else:
             surf_sets[name] = val
 
-    return points_update, point_ids, cells, node_sets, elem_sets, surf_sets
+    return Mesh(
+        points_total,
+        point_ids_total,
+        cells_total,
+        node_sets,
+        elem_sets,
+        surf_sets,
+        validate_flag,
+    )

@@ -51,6 +51,7 @@ class Mesh:
         self.points = points
         self.point_ids = point_ids
 
+        # list of unique element blocks, those with the same element_type already concatenated
         self.cells = cells
 
         self.node_sets = node_sets or {}
@@ -83,16 +84,24 @@ class Mesh:
                 f"Point ids has length {len(self.point_ids)}, but there are {len(self.points)} points."
             )
 
+        # Validate if all nodes in element connectivity exist in points
+        all_node_ids_in_elements = set()
+        for block in self.cells:
+            for node_id in block.connectivity.flatten():
+                all_node_ids_in_elements.add(node_id)
+        if not set(self.point_ids).issuperset(all_node_ids_in_elements):
+            remain_nodes = all_node_ids_in_elements.difference(set(self.point_ids))
+            raise ValueError(
+                "Node IDs in element connectivity do not exist in point IDs: "
+                + f"{sorted(remain_nodes)}"
+            )
+
         # Validate cells
         if not isinstance(self.cells, list):
             raise TypeError("Cells (elements) must be a list of ElementBlock objects.")
         for i, block in enumerate(self.cells):
             if not isinstance(block, ElementBlock):
                 raise TypeError(f"Element at index {i} is not an ElementBlock object.")
-        # formulate a single cell id list
-        whole_element_ids = []
-        for block in self.cells:
-            whole_element_ids.extend(block.ids)
 
         # Validate node_sets
         if not isinstance(self.node_sets, dict):
@@ -100,9 +109,16 @@ class Mesh:
         for name, nodes_in_set in self.node_sets.items():
             nodes_in_set = np.asarray(nodes_in_set)
             if not set(self.point_ids).issuperset(set(nodes_in_set)):
+                remain_nodes = set(nodes_in_set).difference(set(self.point_ids))
                 raise ValueError(
-                    f"Node IDs in set '{name}' are out of bounds for points array (size {len(self.points)})."
+                    f"Node IDs in set '{name}' has nodes not in point IDs: "
+                    + f"{sorted(remain_nodes)}"
                 )
+
+        # formulate a single cell id list
+        whole_element_ids = []
+        for block in self.cells:
+            whole_element_ids.extend(block.ids)
 
         # Validate elem_sets
         if not isinstance(self.elem_sets, dict):
@@ -111,8 +127,10 @@ class Mesh:
             if not isinstance(blocks_in_set, list):
                 raise TypeError(f"Element set '{name}' must be a list.")
             if not set(whole_element_ids).issuperset(set(blocks_in_set)):
+                remain_elements = set(blocks_in_set).difference(set(whole_element_ids))
                 raise ValueError(
-                    f"Element IDs in set '{name}' are out of bounds for cell ids."
+                    f"Element IDs in set '{name}' has elements not in cell IDs: "
+                    + f"{sorted(remain_elements)}"
                 )
 
         # Validate surface_sets (similar to element_sets)

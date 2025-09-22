@@ -98,7 +98,7 @@ class ElementBlock:
         )
 
     @classmethod
-    def cat(cls, blocks: list[ElementBlock]) -> ElementBlock:
+    def _cat_same_type(cls, blocks: list[ElementBlock]) -> ElementBlock:
         """Concatenates a list of ElementBlock objects."""
         if not blocks:
             return cls.empty()
@@ -124,7 +124,10 @@ class ElementBlock:
         input_list = [b.element_type for b in blocks]
         common_dict = find_common_values_with_indices(input_list)
 
-        ids = np.concatenate([b.ids for b in blocks])
-        connectivity = np.concatenate([b.connectivity for b in blocks])
+        # iterate though unique element_type and concatenate
+        unique_blocks = []
+        for element_type, indices in common_dict.items():
+            sub_blocks = [blocks[i] for i in indices]
+            unique_blocks.append(cls._cat_same_type(sub_blocks))
 
-        return cls(element_type, ids, connectivity)
+        return unique_blocks
