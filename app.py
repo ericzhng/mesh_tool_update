@@ -307,6 +307,40 @@ def handle_update_node(data):
     save_mesh_to_disk()
 
 
+@socketio.on("update_nodes_bulk")
+def handle_update_nodes_bulk(data):
+    """Handles a request to update multiple nodes in the mesh."""
+    global mesh
+    if not mesh:
+        return
+
+    nodes_data = data.get("nodes", [])
+    print(f"[DEBUG] update_nodes_bulk SocketIO event received. Updating {len(nodes_data)} nodes.")
+
+    for updated_node in nodes_data:
+        node_id = updated_node["id"]
+        try:
+            node_index = mesh.point_ids.index(node_id)
+            mesh.points[node_index] = [updated_node["x"], updated_node["y"], 0]  # Assuming 2D
+        except ValueError:
+            print(f"[WARNING] Node with ID {node_id} not found for bulk update.")
+
+    is_dragging = data.get("isDragging", False)
+    dragging_node_id = data.get("draggingNodeId")
+
+    emit(
+        "mesh_data",
+        {
+            "mesh": mesh_to_dict(mesh),
+            "isDragging": is_dragging,
+            "draggingNodeId": dragging_node_id,
+        },
+        broadcast=True,
+    )
+    emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
+
+
 @socketio.on("delete_nodes_bulk")
 def handle_delete_nodes_bulk(data):
     """Handles a request to delete multiple nodes from the mesh."""

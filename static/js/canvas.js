@@ -536,15 +536,19 @@
             if (isDraggingGroup) {
                 const deltaX = (worldPos.x + dragOffset.x) - draggingNode.x;
                 const deltaY = (worldPos.y + dragOffset.y) - draggingNode.y;
+                const updatedNodes = [];
                 window.selectedNodes.forEach(node => {
                     const newX = node.x + deltaX;
                     const newY = node.y + deltaY;
-                    window.updateNodePosition(node.id, newX, newY); // Update local state only
+                    window.updateNodePosition(node.id, newX, newY);
+                    updatedNodes.push({ id: node.id, x: newX, y: newY });
                 });
+                window.sendBulkNodeUpdate(updatedNodes, true, draggingNode.id); // Send bulk update during drag
             } else {
                 const newX = worldPos.x + dragOffset.x;
                 const newY = worldPos.y + dragOffset.y;
-                window.updateNodePosition(draggingNode.id, newX, newY); // Update local state only
+                window.updateNodePosition(draggingNode.id, newX, newY);
+                socket.emit('update_node', { id: draggingNode.id, x: newX, y: newY, isDragging: true, draggingNodeId: draggingNode.id }); // Send single node update during drag
             }
             hasDragged = true;
         }
@@ -703,5 +707,18 @@
     window.setHighlightedConnection = function(connectionId) {
         highlightedConnectionId = connectionId;
         scheduleDrawMesh();
+    };
+
+    window.updateNodePosition = function(nodeId, newX, newY) {
+        const node = nodesMap.get(nodeId);
+        if (node) {
+            node.x = newX;
+            node.y = newY;
+            // Update spatial grid for the moved node
+            if (spatialGrid) {
+                spatialGrid.remove(node);
+                spatialGrid.insert(node);
+            }
+        }
     };
 })();
