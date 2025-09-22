@@ -129,7 +129,7 @@ class Mesh:
             if not set(whole_element_ids).issuperset(set(blocks_in_set)):
                 remain_elements = set(blocks_in_set).difference(set(whole_element_ids))
                 raise ValueError(
-                    f"Element IDs in set '{name}' has elements not in cell IDs: "
+                    f"Element IDs in set '{name}' has elements not in element IDs: "
                     + f"{sorted(remain_elements)}"
                 )
 

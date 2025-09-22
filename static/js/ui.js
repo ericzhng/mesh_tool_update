@@ -49,12 +49,59 @@ function showMessage(msg, type = 'info', duration = 3000) { // Default duration 
 
 window.showMessage = showMessage;
 
-function updateSummary(summary) {
+function updateSummary(mesh) {
     const summaryDiv = document.getElementById('summary');
-    summaryDiv.innerHTML = (summary.num_nodes > 0 || summary.num_lines > 0) ? 
-        `Nodes: <strong>${summary.num_nodes}</strong>, Connections: <strong>${summary.num_lines}</strong>` : 'No mesh loaded';
+    if (!mesh || !mesh.nodes || mesh.nodes.length === 0) {
+        summaryDiv.innerHTML = 'No mesh loaded';
+        return;
+    }
+
+    const num_nodes = mesh.nodes.length;
+    const num_elements = mesh.elements.length;
+    const num_node_sets = Object.keys(mesh.node_sets || {}).length;
+    const num_element_sets = Object.keys(mesh.element_sets || {}).length;
+    const num_surface_sets = Object.keys(mesh.surface_sets || {}).length;
+
+    summaryDiv.innerHTML = `
+        Nodes: <strong>${num_nodes}</strong> | 
+        Elements: <strong>${num_elements}</strong> | 
+        Node Sets: <strong>${num_node_sets}</strong> | 
+        Element Sets: <strong>${num_element_sets}</strong> | 
+        Surface Sets: <strong>${num_surface_sets}</strong>
+    `;
 }
 window.updateSummary = updateSummary;
+
+function updateSetsUI(mesh) {
+    const nodeSetsList = document.getElementById('node-sets-list');
+    const elementSetsList = document.getElementById('element-sets-list');
+    const surfaceSetsList = document.getElementById('surface-sets-list');
+
+    nodeSetsList.innerHTML = '';
+    elementSetsList.innerHTML = '';
+    surfaceSetsList.innerHTML = '';
+
+    if (!mesh) return;
+
+    for (const name in mesh.node_sets) {
+        const li = document.createElement('li');
+        li.textContent = `${name} (${mesh.node_sets[name].length})`;
+        nodeSetsList.appendChild(li);
+    }
+
+    for (const name in mesh.element_sets) {
+        const li = document.createElement('li');
+        li.textContent = `${name} (${mesh.element_sets[name].length})`;
+        elementSetsList.appendChild(li);
+    }
+
+    for (const name in mesh.surface_sets) {
+        const li = document.createElement('li');
+        li.textContent = `${name} (${mesh.surface_sets[name].length})`;
+        surfaceSetsList.appendChild(li);
+    }
+}
+window.updateSetsUI = updateSetsUI;
 
 function triggerFileInput() {
     document.getElementById('mesh-file').click();
@@ -97,7 +144,7 @@ function updateUndoRedoButtons() {
 function newProject() {
     projectFileHandle = null;
     staleFileHandle = null;
-    mesh = { nodes: [], connections: [], elements: [] };
+    mesh = { nodes: [], connections: [], elements: [], node_sets: {}, element_sets: {}, surface_sets: {} };
     nodesMap = new Map();
     spatialGrid = null;
     appState = {
@@ -111,7 +158,8 @@ function newProject() {
         historyManager.pushState();
     }
     scheduleDrawMesh();
-    updateSummary({ num_nodes: 0, num_lines: 0, num_elements: 0 });
+    updateSummary(mesh);
+    updateSetsUI(mesh);
     showMessage('New project started', 'success');
 }
 window.newProject = newProject;

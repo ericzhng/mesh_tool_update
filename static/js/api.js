@@ -36,10 +36,9 @@ function showMesh() {
     }).then(data => {
         if (data.nodes && data.nodes.length > 0) {
             appState.isNewImport = true; // Set flag for recentering
-            socket.emit('get_mesh', data);
+            socket.emit('get_mesh');
             showMessage('Mesh displayed.', 'success');
             appState.meshDisplayed = true; // Set to true when mesh is displayed
-            socket.emit('get_summary');
         } else {
             showMessage('Loaded mesh has no nodes to display.', 'error');
             appState.meshDisplayed = false; // Set to false if no nodes
@@ -65,19 +64,57 @@ function clearMesh() {
 }
 window.clearMesh = clearMesh;
 
-function exportMesh() {
+async function exportMesh() {
     if (!appState.meshDisplayed) return showMessage('Please load and show a mesh before exporting.', 'error');
+
+    let fileHandle = null;
+    if (window.showSaveFilePicker) {
+        try {
+            fileHandle = await window.showSaveFilePicker({
+                suggestedName: 'mesh.deck',
+                types: [{
+                    description: 'Deck Files',
+                    accept: { 'text/plain': ['.deck', '.inp'] },
+                }],
+            });
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                showMessage('Export cancelled.', 'info');
+                return;
+            }
+            console.error(err.name, err.message);
+            showMessage('Error opening save file dialog.', 'error');
+            return;
+        }
+    } else {
+        // Fallback for older browsers, will trigger direct download
+        showMessage('Your browser does not support advanced file saving. File will download directly.', 'info');
+    }
 
     fetch('/export')
         .then(response => {
             if (response.ok) {
                 return response.text();
-            } else {
+            }
+            else {
                 throw new Error('Failed to export mesh.');
             }
         })
-        .then(content => {
-            saveFile(content, 'mesh.deck', 'text/plain');
+        .then(async content => {
+            if (fileHandle) {
+                try {
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(content);
+                    await writable.close();
+                    showMessage('Mesh exported successfully.', 'success');
+                } catch (err) {
+                    console.error('Error writing to file:', err);
+                    showMessage('Error saving mesh to file.', 'error');
+                }
+            } else {
+                // Fallback for browsers without showSaveFilePicker
+                saveFile(content, 'mesh.deck', 'text/plain');
+            }
         })
         .catch(err => {
             showMessage(err.message, 'error');

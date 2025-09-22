@@ -34,6 +34,9 @@ socket.on('mesh_data', data => {
         mesh.nodes = meshData.nodes || [];
         mesh.connections = meshData.connections || [];
         mesh.elements = meshData.elements || [];
+        mesh.node_sets = meshData.node_sets || {};
+        mesh.element_sets = meshData.element_sets || {};
+        mesh.surface_sets = meshData.surface_sets || {};
     }
     
     nodesMap = new Map(mesh.nodes.map(n => [n.id, n]));
@@ -82,7 +85,8 @@ socket.on('mesh_data', data => {
     }
 
     scheduleDrawMesh();
-    window.updateSummary({ num_nodes: mesh.nodes.length, num_lines: mesh.connections.length, num_elements: mesh.elements.length });
+    window.updateSummary(mesh);
+    window.updateSetsUI(mesh);
 });
 
 socket.on('mesh_summary', window.updateSummary);
@@ -130,7 +134,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 spatialGrid = null;
             }
             scheduleDrawMesh();
-            window.updateSummary({ num_nodes: mesh.nodes.length, num_lines: mesh.connections.length, num_elements: mesh.elements.length });
+            window.updateSummary({ num_nodes: mesh.nodes.length });
             // console.log("onStateApplied callback finished. Mesh after rebuild:", mesh);
         },
         onHistoryChange: () => {
@@ -140,7 +144,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     historyManager = new HistoryManager(state, callbacks);
 
-    if (!historyManager.loadFromLocalStorage()) {
+        if (!historyManager.loadFromLocalStorage()) {
         fetch('/last_mesh').then(r => r.json()).then(data => {
             if (data.nodes && data.nodes.length) {
                 mesh.nodes = data.nodes;
@@ -172,7 +176,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 appState.meshDisplayed = false;
             }
             centerAndDrawMesh(mesh); // Always call after initial load
-            window.updateSummary({ num_nodes: mesh.nodes.length, num_lines: mesh.connections.length, num_elements: mesh.elements.length });
+            window.updateSummary({ num_nodes: mesh.nodes.length });
             historyManager.pushState();
         });
     }

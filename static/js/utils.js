@@ -20,10 +20,20 @@ function debounce(func, delay) {
     };
 }
 
-async function saveFile(content, filename, contentType) {
+async function saveFile(content, filename, contentType, fileHandle = null) {
     const blob = new Blob([content], { type: contentType });
 
-    if (window.showSaveFilePicker) {
+    if (fileHandle) {
+        try {
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            showMessage('File saved successfully', 'success');
+        } catch (err) {
+            console.error('Error writing to file:', err);
+            showMessage('Error saving file.', 'error');
+        }
+    } else if (window.showSaveFilePicker) {
         try {
             const handle = await window.showSaveFilePicker({
                 suggestedName: filename,

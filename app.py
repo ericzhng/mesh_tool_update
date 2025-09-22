@@ -9,7 +9,7 @@ from flask import Flask, render_template, request, jsonify, Response
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
 
-from abaqus_io import read_deck, write_deck, Mesh, ElementBlock
+from abaqus_io import read_deck, write_buffer, Mesh, ElementBlock
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -28,6 +28,21 @@ TEMP_MESH_DIR = os.path.join(os.getcwd(), "temp", "mesh_files")
 os.makedirs(os.path.dirname(MESH_INFO_PATH), exist_ok=True)
 os.makedirs(TEMP_MESH_DIR, exist_ok=True)
 
+def save_mesh_to_disk():
+    """Saves the current mesh to disk."""
+    if not mesh:
+        return
+
+    try:
+        with open(MESH_INFO_PATH, "r") as f:
+            mesh_info = json.load(f)
+            mesh_filepath = mesh_info.get("filepath")
+            if mesh_filepath:
+                with open(mesh_filepath, "w") as f:
+                    write_buffer(f, mesh)
+                print(f"[DEBUG] Mesh saved to {mesh_filepath}")
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"[ERROR] Failed to save mesh to disk: {e}")
 
 def mesh_to_dict(mesh_obj: Mesh | None):
     """Converts a Mesh object to a JSON-serializable dictionary."""
@@ -52,7 +67,8 @@ def mesh_to_dict(mesh_obj: Mesh | None):
 
     return {
         "nodes": nodes,
-        "cells": elements,
+        "elements": elements,
+        "connections": connections,
         "node_sets": mesh_obj.node_sets,
         "element_sets": mesh_obj.elem_sets,
         "surface_sets": mesh_obj.surface_sets,
@@ -120,16 +136,22 @@ def get_mesh_summary():
     """Returns a summary of the current mesh."""
     print("[DEBUG] get_mesh_summary called.")
     if not mesh:
-        return {"num_nodes": 0, "num_elements": 0}
+        return {
+            "num_nodes": 0,
+            "num_elements": 0,
+            "num_node_sets": 0,
+            "num_element_sets": 0,
+            "num_surface_sets": 0,
+        }
 
     total_elements = sum(len(block.ids) for block in mesh.cells)
 
     return {
-        "# nodes": len(mesh.points),
-        "# elements": total_elements,
-        "# node_sets": len(mesh.node_sets),
-        "# element_sets": len(mesh.elem_sets),
-        "# surface_sets": len(mesh.surface_sets),
+        "num_nodes": len(mesh.points),
+        "num_elements": total_elements,
+        "num_node_sets": len(mesh.node_sets),
+        "num_element_sets": len(mesh.elem_sets),
+        "num_surface_sets": len(mesh.surface_sets),
     }
 
 
@@ -176,7 +198,7 @@ def export_mesh():
     try:
         # Use an in-memory text buffer to write the deck content
         deck_buffer = io.StringIO()
-        write_deck(deck_buffer, mesh)
+        write_buffer(deck_buffer, mesh)
         deck_content = deck_buffer.getvalue()
         deck_buffer.close()
 
@@ -224,6 +246,7 @@ def handle_add_node(data):
 
     emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 @socketio.on("delete_node")
@@ -250,6 +273,7 @@ def handle_delete_node(data):
 
     emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 @socketio.on("update_node")
@@ -280,6 +304,7 @@ def handle_update_node(data):
         broadcast=True,
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 @socketio.on("delete_nodes_bulk")
@@ -325,6 +350,7 @@ def handle_delete_nodes_bulk(data):
 
     emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 @socketio.on("add_connection")
@@ -344,6 +370,7 @@ def handle_add_connection(data):
         broadcast=True,
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 @socketio.on("delete_connection")
@@ -367,6 +394,7 @@ def handle_delete_connection(data):
         broadcast=True,
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 @socketio.on("add_triangulation_connections")
@@ -384,6 +412,7 @@ def handle_add_triangulation_connections(data):
         broadcast=True,
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 @socketio.on("clear_mesh")
@@ -399,6 +428,7 @@ def handle_clear_mesh():
         broadcast=True,
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 @socketio.on("sync_mesh")
@@ -416,6 +446,7 @@ def handle_sync_mesh(data):
         include_self=False,
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
+    save_mesh_to_disk()
 
 
 if __name__ == "__main__":

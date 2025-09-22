@@ -1,4 +1,4 @@
-let mesh = { nodes: [], connections: [] };
+let mesh = { nodes: [], connections: [], elements: [], node_sets: {}, element_sets: {}, surface_sets: {} };
 let nodesMap = new Map();
 let spatialGrid = null;
 let appState = {
