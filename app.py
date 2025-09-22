@@ -77,7 +77,9 @@ def mesh_to_dict(mesh_obj: Mesh | None):
 
 def dict_to_mesh(mesh_dict: dict):
     """Converts a dictionary to a Mesh object."""
+    print(f"[DEBUG] dict_to_mesh received: {mesh_dict.keys()}")
     if not mesh_dict:
+        print("[DEBUG] dict_to_mesh: Empty dictionary received.")
         return None
 
     nodes = mesh_dict.get("nodes", [])
@@ -86,7 +88,7 @@ def dict_to_mesh(mesh_dict: dict):
 
     # Group elements by type to create ElementBlocks
     elements_by_type = {}
-    for element in mesh_dict.get("cells", []):
+    for element in mesh_dict.get("elements", []):
         el_type = element["type"]
         if el_type not in elements_by_type:
             elements_by_type[el_type] = {"ids": [], "connectivity": []}
@@ -103,7 +105,7 @@ def dict_to_mesh(mesh_dict: dict):
             )
         )
 
-    return Mesh(
+    new_mesh = Mesh(
         points=points,
         point_ids=point_ids,
         cells=cells,
@@ -111,6 +113,8 @@ def dict_to_mesh(mesh_dict: dict):
         elem_sets=mesh_dict.get("element_sets", {}),
         surface_sets=mesh_dict.get("surface_sets", {}),
     )
+    print(f"[DEBUG] dict_to_mesh returning mesh with {len(new_mesh.points)} nodes and {len(new_mesh.cells)} cell blocks.")
+    return new_mesh
 
 
 # Load the last used mesh on startup
@@ -122,6 +126,7 @@ if os.path.exists(MESH_INFO_PATH):
             if mesh_filepath and os.path.exists(mesh_filepath):
                 print(f"[DEBUG] Loading initial mesh from {mesh_filepath}")
                 mesh = read_deck(mesh_filepath)
+                print(f"[DEBUG] Mesh loaded successfully on startup: {mesh is not None}")
     except (json.JSONDecodeError, IOError) as e:
         print(f"[ERROR] Failed to load initial mesh info: {e}")
 
@@ -220,7 +225,9 @@ def export_mesh():
 def last_mesh():
     """Returns the last loaded mesh."""
     print("[DEBUG] /last_mesh endpoint called. Returning current mesh state.")
-    return jsonify(mesh_to_dict(mesh))
+    mesh_dict_for_client = mesh_to_dict(mesh)
+    print(f"[DEBUG] /last_mesh sending mesh_dict: nodes={len(mesh_dict_for_client.get('nodes', []))}, elements={len(mesh_dict_for_client.get('elements', []))}")
+    return jsonify(mesh_dict_for_client)
 
 
 @socketio.on("get_mesh")
@@ -283,7 +290,6 @@ def handle_update_node(data):
         return
 
     node_id = data["id"]
-    print(f"[DEBUG] update_node SocketIO event received. Node ID: {node_id}")
 
     try:
         node_index = mesh.point_ids.index(node_id)
@@ -303,8 +309,9 @@ def handle_update_node(data):
         },
         broadcast=True,
     )
-    emit("mesh_summary", get_mesh_summary(), broadcast=True)
-    save_mesh_to_disk()
+    if not is_dragging:
+        emit("mesh_summary", get_mesh_summary(), broadcast=True)
+        save_mesh_to_disk()
 
 
 @socketio.on("update_nodes_bulk")
@@ -315,7 +322,6 @@ def handle_update_nodes_bulk(data):
         return
 
     nodes_data = data.get("nodes", [])
-    print(f"[DEBUG] update_nodes_bulk SocketIO event received. Updating {len(nodes_data)} nodes.")
 
     for updated_node in nodes_data:
         node_id = updated_node["id"]
@@ -337,8 +343,9 @@ def handle_update_nodes_bulk(data):
         },
         broadcast=True,
     )
-    emit("mesh_summary", get_mesh_summary(), broadcast=True)
-    save_mesh_to_disk()
+    if not is_dragging:
+        emit("mesh_summary", get_mesh_summary(), broadcast=True)
+        save_mesh_to_disk()
 
 
 @socketio.on("delete_nodes_bulk")

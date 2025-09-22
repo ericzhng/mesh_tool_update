@@ -89,7 +89,7 @@ socket.on('mesh_data', data => {
     window.updateSetsUI(mesh);
 });
 
-socket.on('mesh_summary', window.updateSummary);
+
 
 // --- INITIALIZATION ---
 
@@ -134,7 +134,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 spatialGrid = null;
             }
             scheduleDrawMesh();
-            window.updateSummary({ num_nodes: mesh.nodes.length });
+            window.updateSummary(mesh);
             // console.log("onStateApplied callback finished. Mesh after rebuild:", mesh);
         },
         onHistoryChange: () => {
@@ -176,7 +176,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 appState.meshDisplayed = false;
             }
             centerAndDrawMesh(mesh); // Always call after initial load
-            window.updateSummary({ num_nodes: mesh.nodes.length });
+            window.updateSummary(mesh);
             historyManager.pushState();
         });
     }
