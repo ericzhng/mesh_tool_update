@@ -234,3 +234,14 @@ h1 {
     opacity: 0.5;
     pointer-events: none;
 }
+
+/* Custom styles for ordered lists in set categories */
+.set-list {
+    list-style-type: none !important; /* Hide numbers by default */
+    padding-left: 0 !important; /* Remove default padding */
+}
+
+.set-list:not(.hidden) {
+    list-style-type: decimal !important; /* Display numbers when the list is visible */
+    padding-left: 1.5em !important; /* Add padding for the numbers */
+}

@@ -150,6 +150,9 @@ window.addEventListener('DOMContentLoaded', async () => {
                 mesh.nodes = data.nodes;
                 mesh.connections = data.connections || [];
                 mesh.elements = data.elements || [];
+                mesh.node_sets = data.node_sets || {};
+                mesh.element_sets = data.element_sets || {};
+                mesh.surface_sets = data.surface_sets || {};
                 nodesMap = new Map(mesh.nodes.map(n => [n.id, n]));
                 const bounds = { min: [Infinity, Infinity], max: [-Infinity, -Infinity] };
                 for (const node of mesh.nodes) {
@@ -177,6 +180,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
             centerAndDrawMesh(mesh); // Always call after initial load
             window.updateSummary(mesh);
+            window.updateSetsUI(mesh);
             historyManager.pushState();
         });
     }

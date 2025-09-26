@@ -18,6 +18,55 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Collapsible set categories
+    document.querySelectorAll('.set-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const setList = header.nextElementSibling;
+            const arrowIcon = header.querySelector('.arrow-icon');
+            setList.classList.toggle('hidden');
+            arrowIcon.classList.toggle('rotate-180');
+        });
+    });
+
+    // Sidebar resizing functionality
+    const sidebar = document.getElementById('sets-sidebar');
+    const resizer = document.getElementById('sidebar-resizer');
+    const mainContent = document.getElementById('main-content');
+
+    let isResizing = false;
+    let startClientX;
+    let startWidth;
+
+    resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startClientX = e.clientX;
+        startWidth = sidebar.offsetWidth;
+        document.body.style.cursor = 'ew-resize';
+        mainContent.style.userSelect = 'none';
+        mainContent.style.pointerEvents = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        let newWidth = startWidth + (e.clientX - startClientX);
+        
+        // Minimum width
+        if (newWidth < 100) newWidth = 100;
+
+        // Maximum width (e.g., 80% of mainContent width, or leave at least 50px for mesh-canvas)
+        const maxAllowedWidth = mainContent.offsetWidth - 50; 
+        if (newWidth > maxAllowedWidth) newWidth = maxAllowedWidth;
+
+        sidebar.style.width = `${newWidth}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        isResizing = false;
+        document.body.style.cursor = '';
+        mainContent.style.userSelect = '';
+        mainContent.style.pointerEvents = '';
+    });
 });
 
 function showMessage(msg, type = 'info', duration = 3000) { // Default duration to 3000ms (3 seconds)

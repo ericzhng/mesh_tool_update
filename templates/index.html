@@ -103,21 +103,37 @@
             </nav>
         </header>
             <main id="main-content" class="flex-grow flex border-2 border-gray-300 rounded-lg bg-white relative">
-            <div id="sets-sidebar" class="w-64 bg-gray-50 p-4 border-r border-gray-200 overflow-y-auto">
-                <h2 class="text-lg font-bold mb-4">Sets</h2>
-                <div id="node-sets">
-                    <h3 class="font-semibold">Node Sets</h3>
-                    <ul id="node-sets-list" class="list-disc pl-5"></ul>
+            <div id="sets-sidebar" class="bg-gray-50 p-4 border-r border-gray-200 overflow-y-auto flex flex-col" style="width: calc(20% - 8px);">
+                <h2 class="text-lg font-bold mb-4 flex-shrink-0">Sets</h2>
+
+                <!-- Node Sets -->
+                <div class="set-category flex flex-col mb-2">
+                    <button class="set-header flex justify-between items-center w-full py-1 px-2 bg-gray-200 hover:bg-gray-300 rounded-md cursor-pointer">
+                        <h3 class="font-semibold text-sm">Node Sets</h3>
+                        <svg class="arrow-icon w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <ol id="node-sets-list" class="set-list mt-1 text-xs hidden"></ol>
                 </div>
-                <div id="element-sets" class="mt-4">
-                    <h3 class="font-semibold">Element Sets</h3>
-                    <ul id="element-sets-list" class="list-disc pl-5"></ul>
+
+                <!-- Element Sets -->
+                <div class="set-category flex flex-col mb-2">
+                    <button class="set-header flex justify-between items-center w-full py-1 px-2 bg-gray-200 hover:bg-gray-300 rounded-md cursor-pointer">
+                        <h3 class="font-semibold text-sm">Element Sets</h3>
+                        <svg class="arrow-icon w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <ol id="element-sets-list" class="set-list mt-1 text-xs hidden"></ol>
                 </div>
-                <div id="surface-sets" class="mt-4">
-                    <h3 class="font-semibold">Surface Sets</h3>
-                    <ul id="surface-sets-list" class="list-disc pl-5"></ul>
+
+                <!-- Surface Sets -->
+                <div class="set-category flex flex-col mb-2">
+                    <button class="set-header flex justify-between items-center w-full py-1 px-2 bg-gray-200 hover:bg-gray-300 rounded-md cursor-pointer">
+                        <h3 class="font-semibold text-sm">Surface Sets</h3>
+                        <svg class="arrow-icon w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <ol id="surface-sets-list" class="set-list mt-1 text-xs hidden"></ol>
                 </div>
             </div>
+            <div id="sidebar-resizer" class="w-1.5 h-full bg-gray-300 hover:bg-gray-400 cursor-ew-resize flex-shrink-0"></div>
             <div id="edit-mode-indicator" class="hidden absolute top-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-20"></div>
             <canvas id="mesh-canvas" class="w-full h-full flex-grow"></canvas>
         </main>
