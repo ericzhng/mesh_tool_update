@@ -83,7 +83,6 @@ h1 {
 }
 
 #mesh-canvas {
-    width: 100%;
     height: 100%; /* Changed from auto */
     border: 1px solid var(--gray-light);
     background: linear-gradient(135deg, var(--primary-light) 0%, var(--white) 100%);
@@ -235,13 +234,3 @@ h1 {
     pointer-events: none;
 }
 
-/* Custom styles for ordered lists in set categories */
-.set-list {
-    list-style-type: none !important; /* Hide numbers by default */
-    padding-left: 0 !important; /* Remove default padding */
-}
-
-.set-list:not(.hidden) {
-    list-style-type: decimal !important; /* Display numbers when the list is visible */
-    padding-left: 1.5em !important; /* Add padding for the numbers */
-}

@@ -29,43 +29,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Sidebar resizing functionality
+    // Toggle Sets panel
+    const toggleButton = document.getElementById('toggle-sets-panel');
     const sidebar = document.getElementById('sets-sidebar');
-    const resizer = document.getElementById('sidebar-resizer');
-    const mainContent = document.getElementById('main-content');
 
-    let isResizing = false;
-    let startClientX;
-    let startWidth;
-
-    resizer.addEventListener('mousedown', (e) => {
-        isResizing = true;
-        startClientX = e.clientX;
-        startWidth = sidebar.offsetWidth;
-        document.body.style.cursor = 'ew-resize';
-        mainContent.style.userSelect = 'none';
-        mainContent.style.pointerEvents = 'none';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isResizing) return;
-        let newWidth = startWidth + (e.clientX - startClientX);
-        
-        // Minimum width
-        if (newWidth < 100) newWidth = 100;
-
-        // Maximum width (e.g., 80% of mainContent width, or leave at least 50px for mesh-canvas)
-        const maxAllowedWidth = mainContent.offsetWidth - 50; 
-        if (newWidth > maxAllowedWidth) newWidth = maxAllowedWidth;
-
-        sidebar.style.width = `${newWidth}px`;
-    });
-
-    document.addEventListener('mouseup', () => {
-        isResizing = false;
-        document.body.style.cursor = '';
-        mainContent.style.userSelect = '';
-        mainContent.style.pointerEvents = '';
+    toggleButton.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden');
     });
 });
 
@@ -126,27 +95,59 @@ function updateSetsUI(mesh) {
     const elementSetsList = document.getElementById('element-sets-list');
     const surfaceSetsList = document.getElementById('surface-sets-list');
 
+    const nodeSetsHeader = document.getElementById('node-sets-header');
+    const elementSetsHeader = document.getElementById('element-sets-header');
+    const surfaceSetsHeader = document.getElementById('surface-sets-header');
+
     nodeSetsList.innerHTML = '';
     elementSetsList.innerHTML = '';
     surfaceSetsList.innerHTML = '';
 
-    if (!mesh) return;
+    if (!mesh) {
+        nodeSetsHeader.textContent = 'Node Sets';
+        elementSetsHeader.textContent = 'Element Sets';
+        surfaceSetsHeader.textContent = 'Surface Sets';
+        return;
+    }
 
+    const nodeSetsCount = Object.keys(mesh.node_sets || {}).length;
+    const elementSetsCount = Object.keys(mesh.element_sets || {}).length;
+    const surfaceSetsCount = Object.keys(mesh.surface_sets || {}).length;
+
+    nodeSetsHeader.textContent = `Node Sets (#${nodeSetsCount})`;
+    elementSetsHeader.textContent = `Element Sets (#${elementSetsCount})`;
+    surfaceSetsHeader.textContent = `Surface Sets (#${surfaceSetsCount})`;
+
+    let i = 1;
     for (const name in mesh.node_sets) {
         const li = document.createElement('li');
-        li.textContent = `${name} (${mesh.node_sets[name].length})`;
+        li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
+        li.textContent = `${i++}. ${name} (#${mesh.node_sets[name].length})`;
+        li.addEventListener('click', () => {
+            window.highlightSet(name, 'node');
+        });
         nodeSetsList.appendChild(li);
     }
 
+    i = 1;
     for (const name in mesh.element_sets) {
         const li = document.createElement('li');
-        li.textContent = `${name} (${mesh.element_sets[name].length})`;
+        li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
+        li.textContent = `${i++}. ${name} (#${mesh.element_sets[name].length})`;
+        li.addEventListener('click', () => {
+            window.highlightSet(name, 'element');
+        });
         elementSetsList.appendChild(li);
     }
 
+    i = 1;
     for (const name in mesh.surface_sets) {
         const li = document.createElement('li');
-        li.textContent = `${name} (${mesh.surface_sets[name].length})`;
+        li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
+        li.textContent = `${i++}. ${name} (#${mesh.surface_sets[name].length})`;
+        li.addEventListener('click', () => {
+            window.highlightSet(name, 'surface');
+        });
         surfaceSetsList.appendChild(li);
     }
 }

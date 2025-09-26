@@ -294,6 +294,7 @@
     }
 
     window.centerAndDrawMesh = function(data) { // Expose centerAndDrawMesh globally
+        window.resizeCanvas();
         if (!data.nodes || !data.nodes.length) return;
         const rect = canvas.getBoundingClientRect();
 
@@ -362,6 +363,14 @@
     canvas.addEventListener('mousedown', e => {
         const pos = getMousePos(e);
         hasDragged = false;
+
+        if (e.button === 0) { // Left click
+            // Hide the sets sidebar
+            const sidebar = document.getElementById('sets-sidebar');
+            if (sidebar && !sidebar.classList.contains('hidden')) {
+                sidebar.classList.add('hidden');
+            }
+        }
 
         // Find clicked node regardless of button
         const worldPos = toWorld(pos.x, pos.y);
