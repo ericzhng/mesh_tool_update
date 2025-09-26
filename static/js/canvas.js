@@ -290,6 +290,79 @@
             ctx.setLineDash([]); // Reset line dash
         }
 
+        // Highlight sets
+        if (highlightedSet.name && highlightedSet.type) {
+            ctx.save();
+            ctx.lineWidth = 3;
+
+            if (highlightedSet.type === 'node') {
+                const nodeSet = mesh.node_sets[highlightedSet.name];
+                if (nodeSet) {
+                    ctx.strokeStyle = 'yellow';
+                    ctx.fillStyle = 'yellow';
+                    nodeSet.forEach(nodeId => {
+                        const node = nodesMap.get(Number(nodeId)); // Ensure nodeId is a number
+                        if (node) {
+                            const p = toScreen(node.x, node.y);
+                            ctx.beginPath();
+                            ctx.arc(p.x, p.y, nodeRadius + 2, 0, 2 * Math.PI);
+                            ctx.fill();
+                            ctx.stroke();
+                        }
+                    });
+                }
+            } else if (highlightedSet.type === 'element') {
+                const elementSet = mesh.element_sets[highlightedSet.name];
+                if (elementSet) {
+                    ctx.strokeStyle = 'orange';
+                    elementSet.forEach(elementId => {
+                        const elem = mesh.elements.find(e => e.id === Number(elementId)); // Ensure elementId is a number
+                        if (elem) {
+                            const elementNodes = elem.node_ids.map(id => nodesMap.get(Number(id))).filter(n => n); // Ensure node IDs are numbers
+                            if (elementNodes.length > 1) {
+                                ctx.beginPath();
+                                elementNodes.forEach((node, i) => {
+                                    const p = toScreen(node.x, node.y);
+                                    if (i === 0) {
+                                        ctx.moveTo(p.x, p.y);
+                                    } else {
+                                        ctx.lineTo(p.x, p.y);
+                                    }
+                                });
+                                ctx.closePath();
+                                ctx.stroke();
+                            }
+                        }
+                    });
+                }
+            } else if (highlightedSet.type === 'surface') {
+                const surfaceSet = mesh.surface_sets[highlightedSet.name];
+                if (surfaceSet) {
+                    ctx.strokeStyle = 'lime'; // Green for surface sets
+                    surfaceSet.forEach(surfaceElem => {
+                        const elem = mesh.elements.find(e => e.id === Number(surfaceElem.element_id)); // Ensure element_id is a number
+                        if (elem) {
+                            const elementNodes = elem.node_ids.map(id => nodesMap.get(Number(id))).filter(n => n); // Ensure node IDs are numbers
+                            if (elementNodes.length > 1) {
+                                ctx.beginPath();
+                                elementNodes.forEach((node, i) => {
+                                    const p = toScreen(node.x, node.y);
+                                    if (i === 0) {
+                                        ctx.moveTo(p.x, p.y);
+                                    } else {
+                                        ctx.lineTo(p.x, p.y);
+                                    }
+                                });
+                                ctx.closePath();
+                                ctx.stroke();
+                            }
+                        }
+                    });
+                }
+            }
+            ctx.restore();
+        }
+
         ctx.restore();
     }
 
@@ -729,5 +802,17 @@
                 spatialGrid.insert(node);
             }
         }
+    };
+
+    let highlightedSet = { name: null, type: null }; // Global variable to store the currently highlighted set
+
+    window.highlightSet = function(name, type) {
+        if (highlightedSet.name === name && highlightedSet.type === type) {
+            // If the same set is clicked again, unhighlight it
+            highlightedSet = { name: null, type: null };
+        } else {
+            highlightedSet = { name: name, type: type };
+        }
+        scheduleDrawMesh();
     };
 })();
