@@ -124,7 +124,7 @@ function updateSetsUI(mesh) {
     for (const name in mesh.node_sets) {
         const li = document.createElement('li');
         li.id = `set-${name}-node`; // Add unique ID
-        li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
+        li.className = 'set-item whitespace-nowrap cursor-pointer p-1 rounded-md transition-colors duration-150 hover:bg-gray-700';
         li.textContent = `${i++}. ${name} (#${mesh.node_sets[name].length})`;
         li.addEventListener('click', () => {
             window.highlightSet(name, 'node');
@@ -136,7 +136,7 @@ function updateSetsUI(mesh) {
     for (const name in mesh.element_sets) {
         const li = document.createElement('li');
         li.id = `set-${name}-element`; // Add unique ID
-        li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
+        li.className = 'set-item whitespace-nowrap cursor-pointer p-1 rounded-md transition-colors duration-150 hover:bg-gray-700';
         li.textContent = `${i++}. ${name} (#${mesh.element_sets[name].length})`;
         li.addEventListener('click', () => {
             window.highlightSet(name, 'element');
@@ -148,7 +148,7 @@ function updateSetsUI(mesh) {
     for (const name in mesh.surface_sets) {
         const li = document.createElement('li');
         li.id = `set-${name}-surface`; // Add unique ID
-        li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
+        li.className = 'set-item whitespace-nowrap cursor-pointer p-1 rounded-md transition-colors duration-150 hover:bg-gray-700';
         li.textContent = `${i++}. ${name} (#${mesh.surface_sets[name].length})`;
         // li.addEventListener('click', () => {
         //     window.highlightSet(name, 'surface');

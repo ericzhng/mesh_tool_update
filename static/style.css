@@ -234,6 +234,21 @@ h1 {
     pointer-events: none;
 }
 
-.highlighted-set-name {
-    background-color: #e0e0e0; /* Light gray background */
+.set-list li {
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    list-style-position: inside;
+    margin-bottom: 4px;
+}
+
+.set-list li:hover {
+    background-color: #e3f2fd; /* --primary-light */
+    color: #0d47a1; /* A darker blue for text */
+}
+
+.set-list li.selected {
+    background-color: #1a73e8; /* --primary */
+    color: white;
+    font-weight: 500;
 }

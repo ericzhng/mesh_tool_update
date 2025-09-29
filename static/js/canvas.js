@@ -472,7 +472,7 @@
             }
             if (clickedNode) {
                 if (appState.removeNodeMode) {
-                    window.selectedNodes = [clickedNode];
+                    window.selectedNodes = [clickedNode]; // This is fine, deleteSelected will handle it
                     window.deleteSelected();
                     window.selectedNodes = [];
                 }
@@ -565,6 +565,9 @@
                     appState.firstNodeForConnection = null;
                     canvas.style.cursor = 'default';
                     showMessage('Add Connection mode cancelled.', 'info');
+                } else if (window.highlightedSet.name) {
+                    // If a set is highlighted, clicking empty space should de-highlight it.
+                    window.highlightSet(null, null);
                 } else if (appState.removeNodeMode) {
                     isSelecting = true;
                     selectStart = pos;
@@ -815,7 +818,7 @@
 
         // Manage UI highlighting
         if (currentHighlightedSetElement) {
-            currentHighlightedSetElement.classList.remove('highlighted-set-name');
+            currentHighlightedSetElement.classList.remove('bg-blue-800', 'text-white', 'font-bold');
         }
 
         if (name && window.highlightedSet.name === name && window.highlightedSet.type === type) {
@@ -823,7 +826,7 @@
             const newHighlightedElement = document.getElementById(newHighlightedElementId);
 
             if (newHighlightedElement) {
-                newHighlightedElement.classList.add('highlighted-set-name');
+                newHighlightedElement.classList.add('bg-blue-800', 'text-white', 'font-bold');
                 currentHighlightedSetElement = newHighlightedElement;
             }
         } else {
