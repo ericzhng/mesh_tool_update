@@ -131,8 +131,12 @@ window.addEventListener('DOMContentLoaded', async () => {
                 const cellSize = range / Math.max(1, Math.sqrt(mesh.nodes.length) / 4);
                 spatialGrid = new SpatialHashGrid(bounds, [cellSize, cellSize]);
                 mesh.nodes.forEach(node => spatialGrid.insert(node));
+                appState.meshLoaded = true;
+                appState.meshDisplayed = true;
             } else {
                 spatialGrid = null;
+                appState.meshLoaded = false;
+                appState.meshDisplayed = false;
             }
             scheduleDrawMesh();
             window.updateSummary(mesh);

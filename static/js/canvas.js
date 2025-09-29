@@ -291,28 +291,28 @@
         }
 
         // Highlight sets
-        if (highlightedSet.name && highlightedSet.type) {
+        if (window.highlightedSet.name && window.highlightedSet.type) {
             ctx.save();
             ctx.lineWidth = 3;
 
-            if (highlightedSet.type === 'node') {
-                const nodeSet = mesh.node_sets[highlightedSet.name];
+            if (window.highlightedSet.type === 'node') {
+                const nodeSet = mesh.node_sets[window.highlightedSet.name];
                 if (nodeSet) {
-                    ctx.strokeStyle = 'yellow';
-                    ctx.fillStyle = 'yellow';
+                    ctx.strokeStyle = '#4169E1'; // Royal Blue
+                    ctx.fillStyle = '#4169E1'; // Royal Blue
                     nodeSet.forEach(nodeId => {
                         const node = nodesMap.get(Number(nodeId)); // Ensure nodeId is a number
                         if (node) {
                             const p = toScreen(node.x, node.y);
                             ctx.beginPath();
-                            ctx.arc(p.x, p.y, nodeRadius + 2, 0, 2 * Math.PI);
+                            ctx.arc(p.x, p.y, nodeRadius, 0, 2 * Math.PI);
                             ctx.fill();
                             ctx.stroke();
                         }
                     });
                 }
-            } else if (highlightedSet.type === 'element') {
-                const elementSet = mesh.element_sets[highlightedSet.name];
+            } else if (window.highlightedSet.type === 'element') {
+                const elementSet = mesh.element_sets[window.highlightedSet.name];
                 if (elementSet) {
                     ctx.strokeStyle = 'orange';
                     elementSet.forEach(elementId => {
@@ -335,8 +335,8 @@
                         }
                     });
                 }
-            } else if (highlightedSet.type === 'surface') {
-                const surfaceSet = mesh.surface_sets[highlightedSet.name];
+            } else if (window.highlightedSet.type === 'surface') {
+                const surfaceSet = mesh.surface_sets[window.highlightedSet.name];
                 if (surfaceSet) {
                     ctx.strokeStyle = 'white'; // White for surface sets
                     surfaceSet.forEach(surfaceElem => {
@@ -437,14 +437,6 @@
         const pos = getMousePos(e);
         hasDragged = false;
 
-        if (e.button === 0) { // Left click
-            // Hide the sets sidebar
-            const sidebar = document.getElementById('sets-sidebar');
-            if (sidebar && !sidebar.classList.contains('hidden')) {
-                sidebar.classList.add('hidden');
-            }
-        }
-
         // Find clicked node regardless of button
         const worldPos = toWorld(pos.x, pos.y);
         let clickedNode = null;
@@ -475,6 +467,9 @@
             canvas.style.cursor = 'grabbing';
         }
         else if (e.button === 0) { // Left click
+            if (window.highlightedSet.name) {
+                window.highlightSet(null, null);
+            }
             if (clickedNode) {
                 if (appState.removeNodeMode) {
                     window.selectedNodes = [clickedNode];
@@ -804,15 +799,35 @@
         }
     };
 
-    let highlightedSet = { name: null, type: null }; // Global variable to store the currently highlighted set
+    window.highlightedSet = { name: null, type: null }; // Global variable to store the currently highlighted set
+    let currentHighlightedSetElement = null;
 
     window.highlightSet = function(name, type) {
-        if (highlightedSet.name === name && highlightedSet.type === type) {
-            // If the same set is clicked again, unhighlight it
-            highlightedSet = { name: null, type: null };
+        // Toggle canvas highlight state
+        if (window.highlightedSet.name === name && window.highlightedSet.type === type) {
+            window.highlightedSet.name = null;
+            window.highlightedSet.type = null;
         } else {
-            highlightedSet = { name: name, type: type };
+            window.highlightedSet.name = name;
+            window.highlightedSet.type = type;
         }
         scheduleDrawMesh();
+
+        // Manage UI highlighting
+        if (currentHighlightedSetElement) {
+            currentHighlightedSetElement.classList.remove('highlighted-set-name');
+        }
+
+        if (name && window.highlightedSet.name === name && window.highlightedSet.type === type) {
+            const newHighlightedElementId = `set-${name}-${type}`;
+            const newHighlightedElement = document.getElementById(newHighlightedElementId);
+
+            if (newHighlightedElement) {
+                newHighlightedElement.classList.add('highlighted-set-name');
+                currentHighlightedSetElement = newHighlightedElement;
+            }
+        } else {
+            currentHighlightedSetElement = null;
+        }
     };
 })();

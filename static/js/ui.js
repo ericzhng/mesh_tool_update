@@ -90,7 +90,7 @@ function updateSummary(mesh) {
 }
 window.updateSummary = updateSummary;
 
-let currentHighlightedSetElement = null; // New global variable to track the currently highlighted UI element
+
 
 function updateSetsUI(mesh) {
     const nodeSetsList = document.getElementById('node-sets-list');
@@ -158,34 +158,7 @@ function updateSetsUI(mesh) {
 }
 window.updateSetsUI = updateSetsUI;
 
-// Store the original highlightSet function
-const originalHighlightSet = window.highlightSet;
 
-// Override window.highlightSet to also manage UI highlighting
-window.highlightSet = function(name, type) {
-    // Call the original canvas highlighting function
-    originalHighlightSet(name, type);
-
-    // Manage UI highlighting
-    if (currentHighlightedSetElement) {
-        currentHighlightedSetElement.classList.remove('highlighted-set-name');
-    }
-
-    // Determine if we are unhighlighting or highlighting a new set
-    // The originalHighlightSet function toggles the highlightedSet state.
-    // So, if highlightedSet.name is null after originalHighlightSet, it means it was unhighlighted.
-    if (window.highlightedSet.name === name && window.highlightedSet.type === type) {
-        const newHighlightedElementId = `set-${name}-${type}`;
-        const newHighlightedElement = document.getElementById(newHighlightedElementId);
-
-        if (newHighlightedElement) {
-            newHighlightedElement.classList.add('highlighted-set-name');
-            currentHighlightedSetElement = newHighlightedElement;
-        }
-    } else {
-        currentHighlightedSetElement = null; // No set is highlighted, or it was unhighlighted
-    }
-};
 
 
 function triggerFileInput() {
