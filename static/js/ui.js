@@ -90,6 +90,8 @@ function updateSummary(mesh) {
 }
 window.updateSummary = updateSummary;
 
+let currentHighlightedSetElement = null; // New global variable to track the currently highlighted UI element
+
 function updateSetsUI(mesh) {
     const nodeSetsList = document.getElementById('node-sets-list');
     const elementSetsList = document.getElementById('element-sets-list');
@@ -121,6 +123,7 @@ function updateSetsUI(mesh) {
     let i = 1;
     for (const name in mesh.node_sets) {
         const li = document.createElement('li');
+        li.id = `set-${name}-node`; // Add unique ID
         li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
         li.textContent = `${i++}. ${name} (#${mesh.node_sets[name].length})`;
         li.addEventListener('click', () => {
@@ -132,6 +135,7 @@ function updateSetsUI(mesh) {
     i = 1;
     for (const name in mesh.element_sets) {
         const li = document.createElement('li');
+        li.id = `set-${name}-element`; // Add unique ID
         li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
         li.textContent = `${i++}. ${name} (#${mesh.element_sets[name].length})`;
         li.addEventListener('click', () => {
@@ -143,15 +147,46 @@ function updateSetsUI(mesh) {
     i = 1;
     for (const name in mesh.surface_sets) {
         const li = document.createElement('li');
+        li.id = `set-${name}-surface`; // Add unique ID
         li.className = 'whitespace-nowrap cursor-pointer hover:text-blue-500';
         li.textContent = `${i++}. ${name} (#${mesh.surface_sets[name].length})`;
-        li.addEventListener('click', () => {
-            window.highlightSet(name, 'surface');
-        });
+        // li.addEventListener('click', () => {
+        //     window.highlightSet(name, 'surface');
+        // });
         surfaceSetsList.appendChild(li);
     }
 }
 window.updateSetsUI = updateSetsUI;
+
+// Store the original highlightSet function
+const originalHighlightSet = window.highlightSet;
+
+// Override window.highlightSet to also manage UI highlighting
+window.highlightSet = function(name, type) {
+    // Call the original canvas highlighting function
+    originalHighlightSet(name, type);
+
+    // Manage UI highlighting
+    if (currentHighlightedSetElement) {
+        currentHighlightedSetElement.classList.remove('highlighted-set-name');
+    }
+
+    // Determine if we are unhighlighting or highlighting a new set
+    // The originalHighlightSet function toggles the highlightedSet state.
+    // So, if highlightedSet.name is null after originalHighlightSet, it means it was unhighlighted.
+    if (window.highlightedSet.name === name && window.highlightedSet.type === type) {
+        const newHighlightedElementId = `set-${name}-${type}`;
+        const newHighlightedElement = document.getElementById(newHighlightedElementId);
+
+        if (newHighlightedElement) {
+            newHighlightedElement.classList.add('highlighted-set-name');
+            currentHighlightedSetElement = newHighlightedElement;
+        }
+    } else {
+        currentHighlightedSetElement = null; // No set is highlighted, or it was unhighlighted
+    }
+};
+
 
 function triggerFileInput() {
     document.getElementById('mesh-file').click();

@@ -7,6 +7,7 @@ let lastEmittedConnection = null; // New: To store the last connection emitted t
 
 socket.on('mesh_data', data => {
     const meshData = data.mesh || data;
+    const connections = data.connections || [];
     const isDragging = data.isDragging || false;
     const draggingNodeId = data.draggingNodeId || null;
 
@@ -27,12 +28,12 @@ socket.on('mesh_data', data => {
             }
         }
         // Also update connections and elements as they are not affected by local drag
-        mesh.connections = meshData.connections || [];
+        mesh.connections = connections;
         mesh.elements = meshData.elements || [];
     } else {
         // If not dragging, or no specific dragging node, update all mesh data normally
         mesh.nodes = meshData.nodes || [];
-        mesh.connections = meshData.connections || [];
+        mesh.connections = connections;
         mesh.elements = meshData.elements || [];
         mesh.node_sets = meshData.node_sets || {};
         mesh.element_sets = meshData.element_sets || {};
@@ -135,6 +136,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
             scheduleDrawMesh();
             window.updateSummary(mesh);
+            window.updateSetsUI(mesh);
             // console.log("onStateApplied callback finished. Mesh after rebuild:", mesh);
         },
         onHistoryChange: () => {

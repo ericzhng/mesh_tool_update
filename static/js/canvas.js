@@ -338,7 +338,7 @@
             } else if (highlightedSet.type === 'surface') {
                 const surfaceSet = mesh.surface_sets[highlightedSet.name];
                 if (surfaceSet) {
-                    ctx.strokeStyle = 'lime'; // Green for surface sets
+                    ctx.strokeStyle = 'white'; // White for surface sets
                     surfaceSet.forEach(surfaceElem => {
                         const elem = mesh.elements.find(e => e.id === Number(surfaceElem.element_id)); // Ensure element_id is a number
                         if (elem) {

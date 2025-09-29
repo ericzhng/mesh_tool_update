@@ -68,7 +68,6 @@ def mesh_to_dict(mesh_obj: Mesh | None):
     return {
         "nodes": nodes,
         "elements": elements,
-        "connections": connections,
         "node_sets": mesh_obj.node_sets,
         "element_sets": mesh_obj.elem_sets,
         "surface_sets": mesh_obj.surface_sets,
@@ -226,6 +225,7 @@ def last_mesh():
     """Returns the last loaded mesh."""
     print("[DEBUG] /last_mesh endpoint called. Returning current mesh state.")
     mesh_dict_for_client = mesh_to_dict(mesh)
+    mesh_dict_for_client["connections"] = connections
     print(f"[DEBUG] /last_mesh sending mesh_dict: nodes={len(mesh_dict_for_client.get('nodes', []))}, elements={len(mesh_dict_for_client.get('elements', []))}")
     return jsonify(mesh_dict_for_client)
 
@@ -234,7 +234,7 @@ def last_mesh():
 def handle_get_mesh(data=None):
     """Handles a request to get the current mesh."""
     print("[DEBUG] get_mesh SocketIO event received.")
-    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False})
+    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False})
 
 
 @socketio.on("add_node")
@@ -251,7 +251,7 @@ def handle_add_node(data):
     mesh.points = np.vstack([mesh.points, new_point_coords])
     mesh.point_ids.append(new_point_id)
 
-    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
+    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
     save_mesh_to_disk()
 
@@ -278,7 +278,7 @@ def handle_delete_node(data):
     except ValueError:
         print(f"[WARNING] Node with ID {node_id_to_delete} not found for deletion.")
 
-    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
+    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
     save_mesh_to_disk()
 
@@ -304,6 +304,7 @@ def handle_update_node(data):
         "mesh_data",
         {
             "mesh": mesh_to_dict(mesh),
+            "connections": connections,
             "isDragging": is_dragging,
             "draggingNodeId": dragging_node_id,
         },
@@ -338,6 +339,7 @@ def handle_update_nodes_bulk(data):
         "mesh_data",
         {
             "mesh": mesh_to_dict(mesh),
+            "connections": connections,
             "isDragging": is_dragging,
             "draggingNodeId": dragging_node_id,
         },
@@ -389,7 +391,7 @@ def handle_delete_nodes_bulk(data):
         and c["target"] not in node_ids_to_delete
     ]
 
-    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "isDragging": False}, broadcast=True)
+    emit("mesh_data", {"mesh": mesh_to_dict(mesh), "connections": connections, "isDragging": False}, broadcast=True)
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
     save_mesh_to_disk()
 

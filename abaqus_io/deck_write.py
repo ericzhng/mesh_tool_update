@@ -82,13 +82,14 @@ def write_buffer(f, mesh: Mesh, comment_line: str = "") -> None:
     f.write("**" + "-" * 78 + "\n")
     f.write("**  SURFACE DEFINITIONS\n")
 
-    for name, ids in mesh.surface_sets.items():
-        if len(ids) > 0:
+    for name, sets in mesh.surface_sets.items():
+        if len(sets) > 0:
             f.write(f"*SURFACE, NAME={name}, TYPE=ELEMENT\n")
+            # join the sets with comma
             output = "\n".join(
-                func_node_line(ids[i : i + 2]) for i in range(0, len(ids), 2)
+                func_node_line(sets[i : i + 2]) for i in range(0, len(sets), 2)
             )
-            f.write(" " + output + "\n")
+            f.write(output + "\n")
             f.write("**" + "-" * 78 + "\n")
 
     f.flush()

@@ -98,7 +98,7 @@ h1 {
     background: var(--accent-light);
     padding: 0.8em 1em;
     border-radius: 8px;
-    border-left: 4px solid var(--accent-dark);
+    border-left: 44px solid var(--accent-dark);
 }
 
 .modern-btn {
@@ -234,3 +234,6 @@ h1 {
     pointer-events: none;
 }
 
+.highlighted-set-name {
+    background-color: #e0e0e0; /* Light gray background */
+}
