@@ -1,5 +1,0 @@
-flask
-flask-socketio
-werkzeug
-rich
-PyYAML

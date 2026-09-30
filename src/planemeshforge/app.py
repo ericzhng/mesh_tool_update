@@ -9,7 +9,7 @@ from flask import Flask, render_template, request, jsonify, Response
 from flask_socketio import SocketIO, emit
 from werkzeug.utils import secure_filename
 
-from abaqus_io import read_deck, write_buffer, Mesh, ElementBlock
+from .abaqus_io import read_deck, write_buffer, Mesh, ElementBlock
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -19,14 +19,31 @@ mesh: Mesh | None = None
 # Global variable to hold connections for frontend visualization
 connections: list = []
 
+# Path for storing information about the last used mesh file; set by init_storage()
+MESH_INFO_PATH = None
+TEMP_MESH_DIR = None
 
-# Path for storing information about the last used mesh file
-MESH_INFO_PATH = os.path.join(os.getcwd(), "temp", "mesh_info.json")
-TEMP_MESH_DIR = os.path.join(os.getcwd(), "temp", "mesh_files")
 
-# Ensure the temporary directories exist
-os.makedirs(os.path.dirname(MESH_INFO_PATH), exist_ok=True)
-os.makedirs(TEMP_MESH_DIR, exist_ok=True)
+def init_storage(data_dir):
+    """Points the app at its storage directory, creating it and loading the last mesh."""
+    global mesh, MESH_INFO_PATH, TEMP_MESH_DIR
+
+    MESH_INFO_PATH = os.path.join(data_dir, "mesh_info.json")
+    TEMP_MESH_DIR = os.path.join(data_dir, "mesh_files")
+    os.makedirs(TEMP_MESH_DIR, exist_ok=True)
+
+    if os.path.exists(MESH_INFO_PATH):
+        try:
+            with open(MESH_INFO_PATH, "r") as f:
+                mesh_info = json.load(f)
+                mesh_filepath = mesh_info.get("filepath")
+                if mesh_filepath and os.path.exists(mesh_filepath):
+                    print(f"[DEBUG] Loading initial mesh from {mesh_filepath}")
+                    mesh = read_deck(mesh_filepath)
+                    print(f"[DEBUG] Mesh loaded successfully on startup: {mesh is not None}")
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"[ERROR] Failed to load initial mesh info: {e}")
+
 
 def save_mesh_to_disk():
     """Saves the current mesh to disk."""
@@ -114,20 +131,6 @@ def dict_to_mesh(mesh_dict: dict):
     )
     print(f"[DEBUG] dict_to_mesh returning mesh with {len(new_mesh.points)} nodes and {len(new_mesh.cells)} cell blocks.")
     return new_mesh
-
-
-# Load the last used mesh on startup
-if os.path.exists(MESH_INFO_PATH):
-    try:
-        with open(MESH_INFO_PATH, "r") as f:
-            mesh_info = json.load(f)
-            mesh_filepath = mesh_info.get("filepath")
-            if mesh_filepath and os.path.exists(mesh_filepath):
-                print(f"[DEBUG] Loading initial mesh from {mesh_filepath}")
-                mesh = read_deck(mesh_filepath)
-                print(f"[DEBUG] Mesh loaded successfully on startup: {mesh is not None}")
-    except (json.JSONDecodeError, IOError) as e:
-        print(f"[ERROR] Failed to load initial mesh info: {e}")
 
 
 def allowed_file(filename):
@@ -490,7 +493,3 @@ def handle_sync_mesh(data):
     )
     emit("mesh_summary", get_mesh_summary(), broadcast=True)
     save_mesh_to_disk()
-
-
-if __name__ == "__main__":
-    socketio.run(app, debug=True, port=5050)

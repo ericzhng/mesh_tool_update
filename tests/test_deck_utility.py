@@ -3,7 +3,7 @@ import io
 import numpy as np
 from unittest.mock import patch
 
-from abaqus_io.deck_utility import (
+from planemeshforge.abaqus_io.deck_utility import (
     _get_option_map,
     _read_nodes,
     _read_cells,
@@ -165,7 +165,7 @@ class TestReadCells(unittest.TestCase):
             "C3D8": {"dim": 3, "nodes": 8},
             "C3D4": {"dim": 3, "nodes": 4},
         }
-        self.patcher = patch("abaqus_io.deck_utility._config", self.mock_config)
+        self.patcher = patch("planemeshforge.abaqus_io.deck_utility._config", self.mock_config)
         self.patcher.start()
 
     def tearDown(self):

@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from abaqus_io.element_block import ElementBlock
+from planemeshforge.abaqus_io.element_block import ElementBlock
 
 
 class TestElementBlock(unittest.TestCase):

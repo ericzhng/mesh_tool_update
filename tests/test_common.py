@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from abaqus_io import _common
+from planemeshforge.abaqus_io import _common
 import io
 import contextlib
 from unittest.mock import patch, mock_open

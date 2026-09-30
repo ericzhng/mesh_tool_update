@@ -8,7 +8,7 @@ from typing import List
 
 import numpy as np
 
-from abaqus_io.mesh_io import Mesh
+from .mesh_io import Mesh
 from .element_block import ElementBlock
 from .deck_utility import _get_option_map, _read_cells, _read_nodes, _read_set
 

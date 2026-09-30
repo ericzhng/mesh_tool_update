@@ -1,33 +1,31 @@
+import tempfile
 import unittest
-import os
+from pathlib import Path
+
 import numpy as np
 
-from abaqus_io.deck_read import read_deck
-from abaqus_io.deck_write import write_deck
-from abaqus_io.mesh_io import Mesh
+from planemeshforge.abaqus_io.deck_read import read_deck
+from planemeshforge.abaqus_io.deck_write import write_deck
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DECK_PATH_READ = DATA_DIR / "geometry-backup.deck"
 
 
+@unittest.skipUnless(DECK_PATH_READ.exists(), f"{DECK_PATH_READ} not present in this checkout")
 class TestAbaqusDeckIO(unittest.TestCase):
 
     def setUp(self):
-        # self.deck_path_read = os.path.join("data", "simple_mesh.inp")
-        # self.deck_path_write = os.path.join("data", "simple_mesh_rewrite.inp")
-
-        self.deck_path_read = os.path.join("data", "geometry-backup.deck")
-        self.deck_path_write = os.path.join("data", "geometry-backup_rewrite.inp")
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.deck_path_write = Path(self._tmpdir.name) / "geometry-backup_rewrite.inp"
 
     def tearDown(self):
-        pass
+        self._tmpdir.cleanup()
 
     def test_read_abaqus(self):
-        mesh_data = read_deck(self.deck_path_read)
-        # self.assertEqual(len(mesh_data.points), 12)
-        # self.assertEqual(len(mesh_data.cells), 1)
-        # self.assertEqual(len(mesh_data.cells[0]), 4)
-        # self.assertEqual(mesh_data.cells[0].element_type, "CGAX3")
+        read_deck(DECK_PATH_READ)
 
     def test_write_abaqus(self):
-        mesh_data = read_deck(self.deck_path_read)
+        mesh_data = read_deck(DECK_PATH_READ)
         write_deck(self.deck_path_write, mesh_data)
 
         mesh_data_read_back = read_deck(self.deck_path_write)
