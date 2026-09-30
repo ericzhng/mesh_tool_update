@@ -2,40 +2,67 @@
 
 ## Project Overview
 
-PlaneMeshForge is a web-based tool for interactive manipulation and visualization of 2D structural meshes. It provides a user-friendly interface to load, view, edit, and export mesh data, with real-time feedback on mesh information as changes are made, supporting operations like moving, adding, or removing nodes, and managing connections (lines) between nodes.
+PlaneMeshForge is a web-based tool for interactively building and editing 2D structural meshes. It renders the mesh on an HTML5 Canvas, edits nodes, elements (lines/triangles/quads), and sets directly, and keeps every open browser tab in sync in real time via Socket.IO. The server is the single source of truth: it owns the mesh, applies every edit, validates it, and tracks undo/redo history.
 
 ## Features
 
-*   **Interactive Mesh Visualization:** Pan, zoom, and rotate the mesh view on an HTML5 Canvas.
-*   **Real-time Mesh Summary:** Displays the current number of nodes, lines (connections), and elements.
-*   **Node Manipulation:**
-    *   Add new nodes at the center of the view.
-    *   Delete selected nodes.
-    *   Move individual or multiple selected nodes by dragging.
-    *   Multi-select nodes using rectangular selection with modifier keys (Ctrl/Cmd for toggle, Shift for add, no modifier for new selection).
-*   **Connection Management:** Add and remove connections between nodes, including automatic triangulation.
-*   **Element Visualization:** Displays 2D elements and their associated connections.
-*   **File Operations:**
-    *   Import mesh data from `.inp` and `.deck` (Abaqus-style) formats.
-    *   Export the current mesh as a `.deck` file.
-    *   New Project, Open Project, Save Project, Save Project As (using the File System Access API where supported, with a download-based fallback).
-*   **Undo/Redo Functionality:** History management for mesh modifications.
-*   **Customizable View:** Toggle visibility of node and element labels.
-*   **Responsive UI:** Adapts to different screen sizes.
+*   **Interactive Mesh Visualization:** Pan, zoom, and rotate on an HTML5 Canvas, with a light/dark theme and optional node/element labels.
+*   **Real elements, not just lines:** Creating a "connection" makes a real `SFMGAX1` line element; triangles (`CGAX3`) and quads (`CGAX4`) are first-class too, so everything you draw exports to `.deck`.
+*   **Selection:** Click, box-select, or lasso-select (Alt+drag) nodes; click to pick a single element. Shift adds, Ctrl toggles.
+*   **Editing tools:** Select, Add Node, Create Line/Triangle/Quad, Delete — each with a keyboard shortcut (see below) and a live overlay preview.
+*   **Inspector panel:** Edit a selected node's exact X/Y, see which elements use it; inspect a selected element's type/connectivity/area; see a bounding box and quick actions for larger selections.
+*   **Transforms:** Translate, rotate (about the centroid or a point), scale, and mirror the selected nodes.
+*   **Mesh utilities:** Merge coincident nodes (with tolerance), renumber node/element ids, split quads into triangles, and Delaunay-triangulate a selected point cloud into real triangle elements.
+*   **Mesh quality check:** Flags inverted/degenerate elements, duplicate elements, and orphan nodes; clicking an issue selects it.
+*   **Sets:** Create/rename/delete node and element sets from the current selection; per-set show/hide and isolate. Surface sets (read from imported decks) are viewable and highlightable.
+*   **Snapping:** Snap to a grid spacing, or snap to the nearest existing node while dragging a single node.
+*   **Undo/redo:** Server-side history (not just a client-side snapshot), shared by every connected client.
+*   **File operations:** Import `.inp`/`.deck`, export `.deck`; New/Open/Save/Save As project files (File System Access API where supported, download-based fallback elsewhere). Old project files that used the earlier "connections" format still open (they're converted to line elements).
+
+### Keyboard shortcuts
+
+| Keys | Action |
+| --- | --- |
+| `V` / `N` / `L` / `T` / `Q` / `D` | Select / Add Node / Create Line / Create Triangle / Create Quad / Delete tool |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
+| `Ctrl+S` / `Ctrl+Shift+S` / `Ctrl+O` | Save / Save As / Open project |
+| `Ctrl+A` | Select all nodes |
+| `Delete` / `Backspace` | Delete selection |
+| `F` | Fit view to mesh |
+| `G` | Toggle snap-to-grid |
+| `R` / `Shift+R` | Rotate view 90° CW / CCW |
+| `+` / `-` | Zoom in / out |
+| `Esc` | Cancel current tool action / clear selection |
 
 ## Technology Stack
 
 *   **Frontend:**
-    *   **HTML5 Canvas:** For mesh rendering.
-    *   **JavaScript (ES6+):** Core logic and interactions.
-    *   **Socket.IO:** Real-time bidirectional communication with the backend.
-    *   **Tailwind CSS:** For utility-first styling.
-    *   **Google Fonts (Roboto):** For typography.
+    *   **HTML5 Canvas** for rendering; a small hand-written CSS design system (no framework, works offline).
+    *   **Vanilla JavaScript (ES modules)** — no build step; Flask serves the modules as static files.
+    *   **Socket.IO client** (vendored) for real-time sync with the backend.
+    *   **Delaunator** (vendored) for client-side Delaunay triangulation.
 *   **Backend:**
-    *   **Flask (Python):** Web framework for serving the frontend and handling API requests.
-    *   **Flask-SocketIO:** Integrates Socket.IO with Flask.
-    *   **NumPy:** Mesh data arrays (points, connectivity).
-    *   **Python:** For mesh parsing and data handling.
+    *   **Flask + Flask-SocketIO** for HTTP routes and the real-time protocol.
+    *   **NumPy** for mesh data arrays (points, connectivity).
+    *   **Python** for mesh parsing, editing, and validation.
+
+## Architecture
+
+The backend is split into three layers:
+
+*   **`core/`** — pure Python + NumPy, no Flask dependency, fully unit-tested. `editor.py`'s `MeshEditor` owns the current `Mesh` and its undo/redo stacks; `ops.py` is the registry of every mutation (add/delete/move nodes, add/delete elements, transform, merge, renumber, split quads, set editing); `transform.py`, `topology.py`, and `quality.py` hold the underlying geometry/topology/validation logic; `serialize.py` converts between `Mesh` and the JSON the client uses.
+*   **`server/`** — adapts `core/` to the web: `routes.py` (HTTP: page, `/load`, `/export`, `/last_mesh`, `/element-types`), `sockets.py` (a single `op` event for every mutation, plus `undo`/`redo`/`get_mesh`/`load_mesh`/`quality_check`), and `session.py` (remembers and reloads the last-opened mesh file across restarts).
+*   **`app.py`** just creates the Flask/SocketIO app and wires the two together.
+
+The frontend is a tree of ES modules grouped by responsibility, with no shared mutable globals — modules only talk to each other through `core/store.js` (mesh data), `core/selection.js`, and a small pub/sub event bus (`core/events.js`):
+
+*   **`core/`** — `store.js` (the mesh, rebuilt from server broadcasts), `selection.js`, `geometry.js`/`hit-test.js` (picking), `spatial-hash-grid.js`.
+*   **`net/`** — `client.js` (the Socket.IO `op`/`undo`/`redo` protocol) and `api.js` (plain HTTP calls).
+*   **`render/`** — `viewport.js` (camera/coordinate transforms) and `renderer.js` (draws grid/elements/nodes/labels/tool overlay).
+*   **`tools/`** — `tool-manager.js` plus one file per tool (`select`, `add-node`, `create-element`, `delete`).
+*   **`commands/`** — a single registry of actions (id, label, shortcut, enabled state) that the menubar, tool rail, context menu, and keyboard shortcuts all read from.
+*   **`ui/`** — `menubar.js`, `toolbar.js`, `context-menu.js`, `statusbar.js`, `shortcuts.js`, `dialogs.js`, `toast.js`, and `panels/` (Inspector, Sets, Utilities).
+*   **`project/`** — New/Open/Save/Save As and the IndexedDB file-handle cache.
 
 ## Project Structure
 
@@ -45,70 +72,23 @@ PlaneMeshForge is a web-based tool for interactive manipulation and visualizatio
 ├── LICENSE                 # MIT
 ├── README.md               # This file
 ├── data/                   # Sample mesh files for manual testing
-│   ├── simple_mesh.inp
-│   └── simple_mesh_include.inp
-├── tests/                  # Unit tests (pytest/unittest)
+├── tests/                  # Unit + Socket.IO integration tests (pytest/unittest)
 ├── src/planemeshforge/     # Installable package
 │   ├── __init__.py         # Package version
 │   ├── __main__.py         # `python -m planemeshforge` entry point
 │   ├── cli.py               # `planemeshforge` console script (argparse)
-│   ├── app.py               # Flask + Flask-SocketIO application
-│   ├── abaqus_io/           # Mesh I/O subpackage
-│   │   ├── mesh_io.py        # Mesh data structure
-│   │   ├── element_block.py  # ElementBlock data structure + supported element types
-│   │   ├── deck_read.py      # Abaqus .inp/.deck reader
-│   │   ├── deck_write.py     # Abaqus .inp/.deck writer
-│   │   ├── deck_utility.py   # Low-level deck parsing helpers
-│   │   ├── _common.py        # Shared helpers, logging, config.yaml loader
+│   ├── app.py               # Flask + Flask-SocketIO app wiring
+│   ├── core/                 # Pure-Python mesh editor (editor, ops, transform, topology, quality, serialize)
+│   ├── server/                # Flask routes + Socket.IO handlers + session persistence
+│   ├── abaqus_io/           # Mesh I/O subpackage (Mesh/ElementBlock, .inp/.deck read+write)
 │   │   └── config.yaml       # Supported element types and their dimensionality
-│   ├── static/               # Frontend static assets
-│   │   ├── style.css
-│   │   └── js/                # JavaScript modules (canvas, state, UI, API, etc.)
+│   ├── static/
+│   │   ├── css/               # tokens.css, layout.css, components.css
+│   │   ├── vendor/            # socket.io.min.js, delaunator.min.js (self-hosted, no CDN)
+│   │   └── js/                # ES modules: core/, net/, render/, tools/, commands/, ui/, project/, main.js
 │   └── templates/
-│       └── index.html        # Main HTML template
+│       └── index.html        # Main HTML shell
 ```
-
-## Detailed Functionalities
-
-### `app.py` (Flask Backend)
-
-The `app.py` module is the core of the backend, managing web requests and real-time mesh data.
-
-*   **Initialization:** Sets up a Flask app and integrates Flask-SocketIO for WebSocket communication.
-*   **Mesh Data Structure:** Maintains a module-level `mesh` object (an `abaqus_io.Mesh`) and a `connections` list in memory.
-*   **Storage (`init_storage`):** Called once at startup by the CLI. Creates the data directory (uploaded meshes, `mesh_info.json` for session persistence) and reloads the last mesh if one was previously loaded.
-*   **File Upload (`/load` POST):**
-    *   Accepts mesh files (`.inp`, `.deck`).
-    *   Saves the uploaded file into the data directory.
-    *   Uses `abaqus_io.read_deck` to parse the file and update the in-memory `mesh`.
-*   **Last Mesh Retrieval (`/last_mesh` GET):** Returns the current in-memory mesh as JSON.
-*   **Mesh Summary (`get_mesh_summary`):** Calculates and returns the number of nodes, elements, and named sets in the current mesh.
-*   **Export (`/export` GET):** Returns the current mesh as a downloadable `.deck` file.
-*   **Socket.IO Event Handlers:**
-    *   `get_mesh`: Emits the current mesh data to connected clients.
-    *   `add_node` / `delete_node` / `update_node` / `update_nodes_bulk` / `delete_nodes_bulk`: Mutate nodes and broadcast the updated mesh and summary.
-    *   `add_connection` / `delete_connection` / `add_triangulation_connections`: Manage connections between nodes.
-    *   `clear_mesh`: Clears all mesh data.
-    *   `sync_mesh`: Accepts a full mesh snapshot from a client (used by project load/undo) and rebroadcasts it to other clients.
-
-### `abaqus_io/` (Mesh I/O)
-
-This subpackage provides the `Mesh` and `ElementBlock` data structures and functions for reading/writing mesh data.
-
-*   **`read_deck(filepath)` / `write_deck(filepath, mesh)`:** Parse and serialize Abaqus-style `.inp`/`.deck` files (`*NODE`, `*ELEMENT`, `*NSET`, `*ELSET`, `*SURFACE` sections).
-*   **`Mesh`:** Holds points, point IDs, cell blocks (elements), and named node/element/surface sets.
-*   **`ElementBlock`:** Holds one element type's IDs and connectivity; supported element types and their dimensionality are declared in `config.yaml`.
-
-### `static/js/` (Frontend JavaScript)
-
-*   **`api.js`:** REST calls to the Flask backend (`uploadMesh`, `showMesh`, `clearMesh`, `exportMatrix`).
-*   **`app.js`:** Socket.IO connection and handlers (`mesh_data`, `mesh_summary`), startup sequencing, node/connection operations.
-*   **`canvas.js`:** Canvas rendering, coordinate transforms, pan/zoom/rotate, node dragging, rectangular selection, context menu.
-*   **`spatial-hash-grid.js`:** `SpatialHashGrid` for efficient node lookups by position/region.
-*   **`state.js`:** Global state (`mesh`, `nodesMap`, `spatialGrid`, `appState`, `view`, `lod`) and the `HistoryManager` (undo/redo, local storage persistence).
-*   **`db.js`:** IndexedDB-backed storage for saved projects.
-*   **`ui.js`:** Menus, status messages, context menu, undo/redo buttons, project New/Open/Save/Save As.
-*   **`utils.js`:** `throttle` / `debounce` helpers.
 
 ## Installation
 
@@ -160,8 +140,8 @@ pytest
 
 ## Coding Conventions
 
-*   **Python (Backend):** Adheres to PEP 8. Functions and classes include docstrings.
+*   **Python (Backend):** Adheres to PEP 8. Functions and classes include docstrings. Mesh-editing logic lives in `core/` and stays free of any Flask/Socket.IO import so it can be unit-tested directly.
 *   **JavaScript (Frontend):**
-    *   Uses camelCase for variable and function names.
-    *   Uses 4 spaces for indentation.
-    *   HTML, CSS, and JS are separated into their respective files.
+    *   Native ES modules (`import`/`export`), no bundler. camelCase for variables/functions, 4-space indentation.
+    *   Modules don't reach into each other's internals — they share state only via `core/store.js`, `core/selection.js`, and `core/events.js`.
+    *   HTML, CSS, and JS stay in their own files; the command registry (`commands/`) is the one place that defines what an action does and when it's enabled.

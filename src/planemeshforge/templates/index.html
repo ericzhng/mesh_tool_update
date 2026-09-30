@@ -1,222 +1,48 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-gray-100">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PlaneMeshForge</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+
+    <script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/delaunator.min.js') }}"></script>
 </head>
-<body class="font-sans overflow-hidden">
-    <div id="app-container" class="w-screen h-screen flex flex-col p-4 pb-16 gap-4 relative">
-        <header id="main-header" class="bg-[#00274C] text-white shadow-md z-30 rounded-lg flex-shrink-0">
-            <nav class="px-4 py-2 flex justify-between items-center">
-                <div class="flex items-center gap-8">
-                    <div class="flex items-center gap-2">
-                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M3 3H21V21H3V3Z" stroke="white" stroke-width="2"/>
-                            <path d="M3 8H21" stroke="white" stroke-width="2"/>
-                            <path d="M8 3V21" stroke="white" stroke-width="2"/>
-                        </svg>
-                        <h1 class="text-xl font-bold">PlaneMeshForge</h1>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <!-- File Menu -->
-                        <div class="relative" data-menu>
-                            <button class="menu-button hover:bg-[#001F3F] px-3 py-2 rounded-md">File</button>
-                            <div class="menu-dropdown absolute left-0 mt-2 w-56 bg-white text-gray-800 rounded-md shadow-lg py-1 hidden">
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'New project created', () => newProject())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                    New Project
-                                </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Opening project...', () => openProject())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                                    Open Project
-                                </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Saving project...', () => save())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                    Save
-                                </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Saving project as...', () => saveAs())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16v2a2 2 0 01-2 2H7a2 2 0 01-2-2v-2m5-11v12l-4-4m4 4l4-4" /></svg>
-                                    Save As...
-                                </a>
-                                <div class="border-t border-gray-200 my-1"></div>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Importing mesh...', () => triggerFileInput())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                                    Import Mesh
-                                </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Exporting mesh...', () => exportMesh())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                    Export Mesh
-                                </a>
-                                <div class="border-t border-gray-200 my-1"></div>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Mesh cleared', () => clearMesh())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                    Clear Mesh
-                                </a>
-                            </div>
-                        </div>
-                        <!-- Edit Menu -->
-                        <div class="relative" data-menu>
-                            <button class="menu-button hover:bg-[#001F3F] px-3 py-2 rounded-md">Edit</button>
-                            <div class="menu-dropdown absolute left-0 mt-2 w-56 bg-white text-gray-800 rounded-md shadow-lg py-1 hidden">
-                                <a href="#" id="revert-button" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Undo action', () => historyManager.undo())">
-                                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l-7-7 7-7m5 7H6"></path></svg>
-                                    Undo
-                                </a>
-                                <a href="#" id="forward-button" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Redo action', () => historyManager.redo())">
-                                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5l7 7-7 7m-5-7h11"></path></svg>
-                                    Redo
-                                </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Reloading page...', () => reloadPage())">
-                                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    Refresh
-                                </a>
-                                <div class="border-t border-gray-200 my-1"></div>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Adding node', () => addNode())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    Add Node
-                                </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Removing selected', () => removeNode())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    Remove Node
-                                </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Adding connection', () => addConnection())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                                    Add Connection
-                                </a>
-                                <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Removing connection', () => removeConnection())">
-                                    <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    Remove Connection
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="text-xs text-blue-200">
-                    <div>Author: Eric Zhang</div>
-                    <div>Rev: V0</div>
-                    <div id="date"></div>
-                </div>
-            </nav>
+<body>
+    <div id="app">
+        <header id="menubar">
+            <span class="brand">PlaneMeshForge</span>
+            <div id="menubar-menus" style="display:flex;"></div>
+            <div class="menubar-spacer"></div>
+            <div id="project-indicator"><span class="dot"></span><span class="name">Untitled</span></div>
         </header>
-        <main id="main-content" class="flex-grow flex border-2 border-gray-300 rounded-lg bg-white relative overflow-hidden">
-            <div id="edit-mode-indicator" class="hidden absolute top-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-20"></div>
-            <canvas id="mesh-canvas" class="h-full w-full flex-grow"></canvas>
+
+        <nav id="tool-rail"></nav>
+
+        <main id="canvas-area">
+            <canvas id="mesh-canvas"></canvas>
+            <div id="tool-hint"></div>
+            <div id="viewport-controls"></div>
+            <div id="toast-stack"></div>
         </main>
-        <button id="toggle-sets-panel" class="absolute top-28 left-8 bg-[#00274C] text-white w-10 h-10 rounded-full shadow-lg z-30 flex items-center justify-center">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-        </button>
-        <div id="sets-sidebar" class="absolute top-36 left-8 bg-white p-4 border border-gray-200 rounded-lg shadow-lg overflow-y-auto z-20 hidden" style="width: 300px; max-height: calc(100vh - 10rem);">
-            <h2 class="text-lg font-bold mb-4 flex-shrink-0">Sets</h2>
 
-            <!-- Node Sets -->
-            <div class="set-category flex flex-col mb-2">
-                <button class="set-header flex justify-between items-center w-full py-1 px-2 bg-gray-200 hover:bg-gray-300 rounded-md cursor-pointer">
-                    <h3 id="node-sets-header" class="font-semibold text-sm">Node Sets</h3>
-                    <svg class="arrow-icon w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <ol id="node-sets-list" class="set-list mt-1 text-xs hidden pl-4"></ol>
-            </div>
+        <aside id="dock"></aside>
 
-            <!-- Element Sets -->
-            <div class="set-category flex flex-col mb-2">
-                <button class="set-header flex justify-between items-center w-full py-1 px-2 bg-gray-200 hover:bg-gray-300 rounded-md cursor-pointer">
-                    <h3 id="element-sets-header" class="font-semibold text-sm">Element Sets</h3>
-                    <svg class="arrow-icon w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <ol id="element-sets-list" class="set-list mt-1 text-xs hidden pl-4"></ol>
-            </div>
-
-            <!-- Surface Sets -->
-            <div class="set-category flex flex-col mb-2">
-                <button class="set-header flex justify-between items-center w-full py-1 px-2 bg-gray-200 hover:bg-gray-300 rounded-md cursor-pointer">
-                    <h3 id="surface-sets-header" class="font-semibold text-sm">Surface Sets</h3>
-                    <svg class="arrow-icon w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <ol id="surface-sets-list" class="set-list mt-1 text-xs hidden pl-4"></ol>
-            </div>
-        </div>
-        <div id="bottom-status-bar" class="fixed bottom-0 left-0 right-0 p-4 flex justify-between items-end gap-4 h-16 z-50">
-            <div id="summary" class="bg-white p-2 rounded-md shadow-md text-gray-700 text-sm flex-shrink-0">No mesh loaded</div>
-            <div id="status-message" class="bg-[#00274C] bg-opacity-75 text-white text-center p-2 rounded-md opacity-0 transition-opacity duration-300 pointer-events-none flex-grow truncate whitespace-nowrap"></div>
-        </div>
+        <footer id="status-bar"></footer>
     </div>
-    <div id="context-menu" class="absolute bg-white text-gray-800 rounded-md shadow-lg py-1 hidden w-56">
-        <div class="px-4 py-2 context-menu-item" onclick="handleContextMenuItemClick(event, 'Toggling node labels', () => toggleCheckboxAndRedraw('show-node-labels-checkbox'))">
-            <input type="checkbox" id="show-node-labels-checkbox" class="h-4 w-4 text-[#FFCB05] border-gray-300 rounded focus:ring-[#FFCB05] pointer-events-none">
-            <label for="show-node-labels-checkbox" class="ml-2 text-sm text-gray-900 flex-grow">Node Labels</label>
-        </div>
-        <div class="px-4 py-2 context-menu-item" onclick="handleContextMenuItemClick(event, 'Toggling element labels', () => toggleCheckboxAndRedraw('show-element-labels-checkbox'))">
-            <input type="checkbox" id="show-element-labels-checkbox" class="h-4 w-4 text-[#FFCB05] border-gray-300 rounded focus:ring-[#FFCB05] pointer-events-none">
-            <label for="show-element-labels-checkbox" class="ml-2 text-sm text-gray-900 flex-grow">Element Labels</label>
-        </div>
-        <div class="border-t border-gray-200 my-1"></div>
-        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Rotating view 90° CW', () => rotateView(Math.PI / 2))">
-            <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.06 7.44 7 7.93v-2.02c-2.83-.48-5-2.94-5-5.91s2.17-5.43 5-5.91V11l4.55-5.45z"/>
-            </svg>
-            Rotate CW (90°)
-        </a>
-        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Rotating view 90° CCW', () => rotateView(-Math.PI / 2))">
-            <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8.45 5.55L13 1v3.07c3.94.49 7 3.85 7 7.93s-3.06 7.44-7 7.93v-2.02c2.83-.48 5-2.94 5-5.91s2.17-5.43-5-5.91V11L8.45 5.55z"/>
-            </svg>
-            Rotate CCW (90°)
-        </a>
-        <div class="border-t border-gray-200 my-1"></div>
-        <a href="#" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Resetting view', () => centerAndDrawMesh(mesh))">
-            <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-            </svg>
-            Home View
-        </a>
-        <div class="border-t border-gray-200 my-1"></div>
-        <a href="#" id="create-triangulation-button" class="block px-4 py-2 text-sm hover:bg-blue-50 flex items-center" onclick="handleContextMenuItemClick(event, 'Creating Delaunay triangulation...', () => createDelaunayTriangulation())">
-            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-            Create Delaunay Triangulation
-        </a>
-        <div class="border-t border-gray-200 my-1"></div>
-        <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Adding node', () => addNode())">
-            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Add Node
-        </a>
-        <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleHeaderMenuItemClick(event, 'Removing selected', () => removeNode())">
-            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Remove Node
-        </a>
-        <div class="border-t border-gray-200 my-1"></div>
-        <a href="#" class="flex items-center px-4 py-2 text-sm hover:bg-blue-50" onclick="handleContextMenuItemClick(event, 'Reloading page...', () => reloadPage())">
-            <svg class="w-5 h-5 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Refresh
-        </a>
-    </div>
-    <input type="file" id="mesh-file" accept=".csv,.json,.inp,.deck" class="hidden">
 
-    <script src="/static/js/utils.js"></script>
-    <script src="/static/js/db.js"></script>
-    <script src="/static/js/state.js"></script>
-    <script src="/static/js/spatial-hash-grid.js"></script>
-    <script src="/static/js/canvas.js"></script>
-    <script src="/static/js/ui.js"></script>
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script>
-        document.getElementById('date').textContent = `Date: ${new Date().toLocaleDateString()}`;
-        const header = document.getElementById('main-header');
-        const mainContent = document.getElementById('main-content');
-        const appContainer = document.getElementById('app-container');
-        const setMainContentHeight = () => {
-            const headerHeight = header.offsetHeight;
-            const appContainerPadding = parseInt(window.getComputedStyle(appContainer).paddingTop) + parseInt(window.getComputedStyle(appContainer).paddingBottom);
-            mainContent.style.height = `calc(100vh - ${headerHeight}px - ${appContainerPadding}px - 1rem)`;
-        };
-        window.addEventListener('resize', setMainContentHeight);
-        setMainContentHeight();        
-    </script>
+    <div id="context-menu"></div>
+
+    <input type="file" id="mesh-file-input" accept=".inp,.deck" style="display:none">
+    <input type="file" id="project-file-input" accept=".json" style="display:none">
+
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

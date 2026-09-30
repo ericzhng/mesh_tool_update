@@ -1,0 +1,138 @@
+// The Inspector dock tab: shows and edits whatever is currently selected -
+// a single node's exact coordinates, a single element's connectivity, or a
+// summary + bounding box for a larger selection.
+import { bus } from "../../core/events.js";
+import { store } from "../../core/store.js";
+import { selection } from "../../core/selection.js";
+import { boundingBox, signedArea } from "../../core/geometry.js";
+import * as client from "../../net/client.js";
+import { toast } from "../toast.js";
+import { icon } from "../icons.js";
+
+function section(title) {
+    const el = document.createElement("div");
+    el.className = "panel-section";
+    if (title) el.innerHTML = `<h3>${title}</h3>`;
+    return el;
+}
+
+function renderSingleNode(root, nodeId) {
+    const node = store.node(nodeId);
+    if (!node) return;
+
+    const info = section("Node");
+    info.innerHTML += `
+        <div class="field-row"><label>ID</label><input type="text" value="${node.id}" disabled></div>
+        <div class="field-row"><label>X</label><input type="number" id="node-x" value="${node.x}" step="0.01"></div>
+        <div class="field-row"><label>Y</label><input type="number" id="node-y" value="${node.y}" step="0.01"></div>
+    `;
+    root.appendChild(info);
+
+    async function commit() {
+        const x = parseFloat(info.querySelector("#node-x").value);
+        const y = parseFloat(info.querySelector("#node-y").value);
+        if (Number.isNaN(x) || Number.isNaN(y)) return;
+        const result = await client.op("move_nodes", { nodes: [{ id: node.id, x, y }] });
+        if (!result.ok) toast.error(result.error);
+    }
+    info.querySelector("#node-x").addEventListener("change", commit);
+    info.querySelector("#node-y").addEventListener("change", commit);
+
+    const elementIds = store.elementsByNode.get(node.id) || [];
+    const usage = section(`Used by ${elementIds.length} element(s)`);
+    for (const eid of elementIds) {
+        const element = store.element(eid);
+        const row = document.createElement("div");
+        row.className = "set-row";
+        row.innerHTML = `<span class="set-name">#${eid} (${element.type})</span>`;
+        row.style.cursor = "pointer";
+        row.addEventListener("click", () => selection.setElements([eid]));
+        usage.appendChild(row);
+    }
+    root.appendChild(usage);
+}
+
+function renderSingleElement(root, elementId) {
+    const element = store.element(elementId);
+    if (!element) return;
+
+    const info = section("Element");
+    const nodes = element.node_ids.map(id => store.node(id)).filter(Boolean);
+    const area = nodes.length > 2 ? signedArea(nodes) : null;
+
+    info.innerHTML += `
+        <div class="field-row"><label>ID</label><input type="text" value="${element.id}" disabled></div>
+        <div class="field-row"><label>Type</label><input type="text" value="${element.type}" disabled></div>
+        ${area !== null ? `<div class="field-row"><label>Area</label><input type="text" value="${area.toFixed(4)}" disabled></div>` : ""}
+    `;
+    root.appendChild(info);
+
+    const nodesSection = section("Nodes");
+    element.node_ids.forEach(nid => {
+        const row = document.createElement("div");
+        row.className = "set-row";
+        row.innerHTML = `<span class="set-name">#${nid}</span>`;
+        row.style.cursor = "pointer";
+        row.addEventListener("click", () => selection.setNodes([nid]));
+        nodesSection.appendChild(row);
+    });
+    root.appendChild(nodesSection);
+}
+
+function renderMultiSelection(root) {
+    const nodeIds = [...selection.nodeIds];
+    const elementIds = [...selection.elementIds];
+    const info = section("Selection");
+
+    const count = document.createElement("div");
+    count.className = "empty-hint";
+    count.textContent = `${nodeIds.length} node(s), ${elementIds.length} element(s) selected`;
+    info.appendChild(count);
+
+    if (nodeIds.length > 1) {
+        const points = nodeIds.map(id => store.node(id)).filter(Boolean);
+        const bbox = boundingBox(points);
+        const bboxRow = document.createElement("div");
+        bboxRow.className = "empty-hint";
+        bboxRow.textContent = `bbox: (${bbox.minX.toFixed(3)}, ${bbox.minY.toFixed(3)}) → (${bbox.maxX.toFixed(3)}, ${bbox.maxY.toFixed(3)})`;
+        info.appendChild(bboxRow);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "btn-row";
+    actions.innerHTML = `<button class="btn btn-danger" id="delete-selection">${icon("trash")}Delete</button>`;
+    info.appendChild(actions);
+    actions.querySelector("#delete-selection").addEventListener("click", async () => {
+        if (nodeIds.length) await client.op("delete_nodes", { ids: nodeIds });
+        if (elementIds.length) await client.op("delete_elements", { ids: elementIds });
+        selection.clear();
+    });
+
+    root.appendChild(info);
+}
+
+export function buildInspectorPanel(root) {
+    function render() {
+        root.innerHTML = "";
+        const nodeCount = selection.nodeIds.size;
+        const elementCount = selection.elementIds.size;
+
+        if (nodeCount === 0 && elementCount === 0) {
+            root.innerHTML = `<div class="empty-hint">Nothing selected. Click a node or element on the canvas.</div>`;
+            return;
+        }
+        if (nodeCount === 1 && elementCount === 0) {
+            renderSingleNode(root, [...selection.nodeIds][0]);
+            return;
+        }
+        if (elementCount === 1 && nodeCount === 0) {
+            renderSingleElement(root, [...selection.elementIds][0]);
+            return;
+        }
+        renderMultiSelection(root);
+    }
+
+    bus.on("selection:changed", render);
+    bus.on("mesh:changed", render);
+    render();
+}

@@ -1,4 +1,6 @@
-class SpatialHashGrid {
+// Uniform grid bucketed by cell size, used for fast node picking / box
+// selection / viewport culling without an O(n) scan on every mouse move.
+export class SpatialHashGrid {
     constructor(bounds, dimensions) {
         this.bounds = bounds;
         this.dimensions = dimensions;
@@ -36,11 +38,11 @@ class SpatialHashGrid {
         }
         return Array.from(results);
     }
-    
+
     queryPoint(position, radius) {
         const searchBounds = {
             min: [position.x - radius, position.y - radius],
-            max: [position.x + radius, position.y + radius]
+            max: [position.x + radius, position.y + radius],
         };
         return this.query(searchBounds);
     }

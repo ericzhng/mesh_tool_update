@@ -1,0 +1,98 @@
+:root {
+    --font-sans: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "Roboto Mono", ui-monospace, "Consolas", monospace;
+
+    --brand-navy: #00274c;
+    --brand-navy-dark: #001a33;
+    --brand-maize: #ffcb05;
+    --brand-maize-dark: #e0b000;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-md: 13px;
+    --font-size-lg: 15px;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.2);
+
+    --transition-fast: 120ms ease;
+
+    color-scheme: light;
+
+    --bg-app: #f4f6f9;
+    --bg-surface: #ffffff;
+    --bg-surface-alt: #eef1f6;
+    --bg-sunken: #e3e8ef;
+    --bg-hover: #e8edf5;
+    --bg-selected: #d6e4ff;
+    --bg-canvas: #fbfcfe;
+
+    --border-color: #d3dae4;
+    --border-color-strong: #b7c1cf;
+
+    --text-primary: #1c2430;
+    --text-secondary: #56606f;
+    --text-muted: #8994a3;
+    --text-on-accent: #ffffff;
+    --text-on-maize: #1c2430;
+
+    --accent: #1f6feb;
+    --accent-hover: #1a5fce;
+    --danger: #d1373f;
+    --danger-hover: #b52d34;
+    --success: #1b8a5a;
+    --warning: #b8860b;
+
+    --node-color: #1f6feb;
+    --node-selected: #ff8a00;
+    --element-fill: rgba(31, 111, 235, 0.08);
+    --element-stroke: #4d5a6b;
+    --grid-line: #e6eaf0;
+    --grid-line-strong: #d0d7e2;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg-app: #14181f;
+    --bg-surface: #1b212b;
+    --bg-surface-alt: #212834;
+    --bg-sunken: #10141a;
+    --bg-hover: #29323f;
+    --bg-selected: #234170;
+    --bg-canvas: #10141a;
+
+    --border-color: #2c3543;
+    --border-color-strong: #3a4556;
+
+    --text-primary: #e7ebf0;
+    --text-secondary: #a9b3c1;
+    --text-muted: #6b7686;
+    --text-on-accent: #ffffff;
+    --text-on-maize: #1c2430;
+
+    --accent: #4c8dff;
+    --accent-hover: #6ba0ff;
+    --danger: #ef5a62;
+    --danger-hover: #f4787e;
+    --success: #34b57c;
+    --warning: #d9a52a;
+
+    --node-color: #4c8dff;
+    --node-selected: #ffab3d;
+    --element-fill: rgba(76, 141, 255, 0.12);
+    --element-stroke: #aeb9c9;
+    --grid-line: #1e2530;
+    --grid-line-strong: #2a3342;
+}
