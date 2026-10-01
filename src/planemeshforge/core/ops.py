@@ -193,25 +193,76 @@ def _set_dict(mesh: Mesh, set_kind: str) -> dict:
         return mesh.node_sets
     if set_kind == "element":
         return mesh.elem_sets
-    raise ValueError("set_kind must be 'node' or 'element'")
+    if set_kind == "surface":
+        return mesh.surface_sets
+    raise ValueError("set_kind must be 'node', 'element', or 'surface'")
+
+
+def _require_simple_set_kind(set_kind: str) -> None:
+    if set_kind not in ("node", "element"):
+        raise ValueError("set_kind must be 'node' or 'element' for this operation; use create_surface for surfaces.")
+
+
+def _element_node_counts(mesh: Mesh) -> dict[int, int]:
+    counts: dict[int, int] = {}
+    for block in mesh.cells:
+        for element_id, conn in zip(block.ids, block.connectivity):
+            counts[int(element_id)] = len(conn)
+    return counts
 
 
 def create_set(mesh: Mesh, set_kind: str, name: str, ids: list[int]) -> dict:
     """Creates (or overwrites) a node/element set with the given members."""
     mesh = _require_mesh(mesh)
+    _require_simple_set_kind(set_kind)
     _set_dict(mesh, set_kind)[name] = sorted(set(ids))
     return {}
 
 
+def create_surface(mesh: Mesh, name: str, faces: list[list[int]]) -> dict:
+    """Creates (or overwrites) a surface set from `(element_id, face_index)` pairs.
+
+    `face_index` is 0-based (edge between `node_ids[i]` and the next node),
+    matching Abaqus face labels `S1`, `S2`, ... (`face_index + 1`). Abaqus
+    lets a `*SURFACE, TYPE=ELEMENT` line reference an element id directly
+    (no backing `*ELSET` needed), so each face becomes its own
+    `elementId, Sn` token pair.
+    """
+    mesh = _require_mesh(mesh)
+    if not faces:
+        raise ValueError("No faces given to create a surface from.")
+
+    node_counts = _element_node_counts(mesh)
+    pairs: list[tuple[int, str]] = []
+    for element_id, face_index in faces:
+        element_id = int(element_id)
+        face_index = int(face_index)
+        num_nodes = node_counts.get(element_id)
+        if num_nodes is None:
+            raise ValueError(f"Unknown element id referenced: {element_id}")
+        if num_nodes < 3:
+            raise ValueError(f"Element {element_id} is not a 2D element; it has no faces.")
+        if not (0 <= face_index < num_nodes):
+            raise ValueError(f"Face index {face_index} out of range for element {element_id}.")
+        pairs.append((element_id, f"S{face_index + 1}"))
+
+    tokens: list[str] = []
+    for element_id, label in sorted(set(pairs)):
+        tokens.extend([str(element_id), label])
+
+    mesh.surface_sets[name] = tokens
+    return {}
+
+
 def delete_set(mesh: Mesh, set_kind: str, name: str) -> dict:
-    """Deletes a node/element set."""
+    """Deletes a node/element/surface set."""
     mesh = _require_mesh(mesh)
     _set_dict(mesh, set_kind).pop(name, None)
     return {}
 
 
 def rename_set(mesh: Mesh, set_kind: str, name: str, new_name: str) -> dict:
-    """Renames a node/element set."""
+    """Renames a node/element/surface set."""
     mesh = _require_mesh(mesh)
     sets = _set_dict(mesh, set_kind)
     if name not in sets:
@@ -225,6 +276,7 @@ def rename_set(mesh: Mesh, set_kind: str, name: str, new_name: str) -> dict:
 def set_add_members(mesh: Mesh, set_kind: str, name: str, ids: list[int]) -> dict:
     """Adds ids to an existing (or new) node/element set."""
     mesh = _require_mesh(mesh)
+    _require_simple_set_kind(set_kind)
     sets = _set_dict(mesh, set_kind)
     sets[name] = sorted(set(sets.get(name, [])) | set(ids))
     return {}
@@ -233,6 +285,7 @@ def set_add_members(mesh: Mesh, set_kind: str, name: str, ids: list[int]) -> dic
 def set_remove_members(mesh: Mesh, set_kind: str, name: str, ids: list[int]) -> dict:
     """Removes ids from a node/element set."""
     mesh = _require_mesh(mesh)
+    _require_simple_set_kind(set_kind)
     sets = _set_dict(mesh, set_kind)
     if name in sets:
         remove = set(ids)
@@ -258,6 +311,7 @@ OPS = {
     "split_quads": split_quads,
     "triangulate": triangulate,
     "create_set": create_set,
+    "create_surface": create_surface,
     "delete_set": delete_set,
     "rename_set": rename_set,
     "set_add_members": set_add_members,

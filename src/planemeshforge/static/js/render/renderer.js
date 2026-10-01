@@ -101,6 +101,27 @@ function drawElements(ctx) {
     ctx.restore();
 }
 
+function drawSelectedFaces(ctx) {
+    if (!selection.faceKeys.size) return;
+    ctx.save();
+    ctx.strokeStyle = cssVar("--accent");
+    ctx.lineWidth = 3;
+    for (const key of selection.faceKeys) {
+        const edge = store.boundaryEdgeMap.get(key);
+        if (!edge || !store.isElementVisible(edge.elementId)) continue;
+        const a = store.node(edge.a);
+        const b = store.node(edge.b);
+        if (!a || !b) continue;
+        const pa = viewport.toScreen(a);
+        const pb = viewport.toScreen(b);
+        ctx.beginPath();
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
 function drawNodes(ctx) {
     ctx.save();
     const radius = Math.max(2.5, Math.min(6, viewport.scale * 0.12));
@@ -130,6 +151,7 @@ export function draw() {
     ctx.clearRect(0, 0, viewport.width, viewport.height);
     drawGrid(ctx);
     drawElements(ctx);
+    drawSelectedFaces(ctx);
     drawNodes(ctx);
     if (toolOverlayFn) toolOverlayFn(ctx);
 }

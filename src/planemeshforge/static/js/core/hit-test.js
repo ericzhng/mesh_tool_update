@@ -40,3 +40,23 @@ export function hitElement(world, radiusPx = DEFAULT_PICK_RADIUS_PX) {
     }
     return null;
 }
+
+// Picks the nearest boundary edge ("surface") of a 2D element - an edge used
+// by exactly one triangle/quad, per `store.boundaryEdges`.
+export function hitEdge(world, radiusPx = DEFAULT_PICK_RADIUS_PX) {
+    const r = pickRadiusWorld(radiusPx);
+    let best = null;
+    let bestDist = Infinity;
+    for (const edge of store.boundaryEdges) {
+        if (!store.isElementVisible(edge.elementId)) continue;
+        const a = store.node(edge.a);
+        const b = store.node(edge.b);
+        if (!a || !b) continue;
+        const d = distanceToSegment(world, a, b);
+        if (d <= r && d < bestDist) {
+            best = edge;
+            bestDist = d;
+        }
+    }
+    return best;
+}

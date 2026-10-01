@@ -117,6 +117,48 @@ class TestSets(unittest.TestCase):
             ops.rename_set(mesh, "node", "a", "b")
 
 
+class TestSurfaceSets(unittest.TestCase):
+    def test_create_surface_stores_direct_element_face_tokens(self):
+        mesh = square_mesh()
+        ops.create_surface(mesh, "surf1", [[1, 0], [2, 1]])
+        self.assertEqual(mesh.surface_sets["surf1"], ["1", "S1", "2", "S2"])
+        self.assertEqual(mesh.elem_sets, {})
+
+    def test_create_surface_rejects_unknown_element(self):
+        mesh = square_mesh()
+        with self.assertRaises(ValueError):
+            ops.create_surface(mesh, "surf1", [[99, 0]])
+
+    def test_create_surface_rejects_out_of_range_face(self):
+        mesh = square_mesh()
+        with self.assertRaises(ValueError):
+            ops.create_surface(mesh, "surf1", [[1, 3]])
+
+    def test_recreate_surface_overwrites_previous_faces(self):
+        mesh = square_mesh()
+        ops.create_surface(mesh, "surf1", [[1, 0], [2, 1]])
+        ops.create_surface(mesh, "surf1", [[1, 0]])
+        self.assertEqual(mesh.surface_sets["surf1"], ["1", "S1"])
+
+    def test_delete_surface(self):
+        mesh = square_mesh()
+        ops.create_surface(mesh, "surf1", [[1, 0], [2, 1]])
+        ops.delete_set(mesh, "surface", "surf1")
+        self.assertNotIn("surf1", mesh.surface_sets)
+
+    def test_rename_surface(self):
+        mesh = square_mesh()
+        ops.create_surface(mesh, "surf1", [[1, 0], [2, 1]])
+        ops.rename_set(mesh, "surface", "surf1", "renamed")
+        self.assertNotIn("surf1", mesh.surface_sets)
+        self.assertEqual(mesh.surface_sets["renamed"], ["1", "S1", "2", "S2"])
+
+    def test_create_set_rejects_surface_kind(self):
+        mesh = square_mesh()
+        with self.assertRaises(ValueError):
+            ops.create_set(mesh, "surface", "surf1", [1])
+
+
 class TestMergeAndRenumber(unittest.TestCase):
     def test_merge_coincident_nodes(self):
         points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])

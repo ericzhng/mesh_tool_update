@@ -70,6 +70,7 @@ export function registerCommands() {
 
     // ---- Tools ----
     toolCommand("tool.select", "select", "Select", "select", "V");
+    toolCommand("tool.selectSurface", "select-surface", "Select Surface", "surface", "S");
     toolCommand("tool.addNode", "add-node", "Add Node", "add-node", "N");
     toolCommand("tool.createLine", "create-line", "Create Line", "line", "L");
     toolCommand("tool.createTriangle", "create-triangle", "Create Triangle", "triangle", "T");

@@ -1,7 +1,31 @@
+import re
+
 import numpy as np
 from numpy.typing import ArrayLike
 
 from .element_block import _config
+
+_FACE_LABEL_RE = re.compile(r"^(S\d+|SPOS|SNEG)$", re.IGNORECASE)
+
+
+def surface_pairs(tokens: list[str]) -> list[tuple[str, str | None]]:
+    """Groups a flat `*SURFACE, TYPE=ELEMENT` token list into (elset_name, face_label) pairs.
+
+    Abaqus allows each referenced element set to optionally be followed by a
+    face label (`S1`, `S2`, ..., `SPOS`, `SNEG`); unlabeled entries are kept
+    as `(name, None)`.
+    """
+    pairs: list[tuple[str, str | None]] = []
+    i = 0
+    while i < len(tokens):
+        name = tokens[i]
+        if i + 1 < len(tokens) and _FACE_LABEL_RE.match(tokens[i + 1]):
+            pairs.append((name, tokens[i + 1]))
+            i += 2
+        else:
+            pairs.append((name, None))
+            i += 1
+    return pairs
 
 
 def _get_option_map(line, required_keys=None):

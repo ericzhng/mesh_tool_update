@@ -8,6 +8,7 @@ import { viewport } from "./render/viewport.js";
 import { scheduleDraw } from "./render/renderer.js";
 import { toolManager } from "./tools/tool-manager.js";
 import { selectTool } from "./tools/select.js";
+import { selectSurfaceTool } from "./tools/select-surface.js";
 import { addNodeTool } from "./tools/add-node.js";
 import { createLineTool, createTriangleTool, createQuadTool } from "./tools/create-element.js";
 import { deleteTool } from "./tools/delete.js";
@@ -70,6 +71,7 @@ async function main() {
     toolManager.attach(canvas);
 
     toolManager.register(selectTool);
+    toolManager.register(selectSurfaceTool);
     toolManager.register(addNodeTool);
     toolManager.register(createLineTool);
     toolManager.register(createTriangleTool);

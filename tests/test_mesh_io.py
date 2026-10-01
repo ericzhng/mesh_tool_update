@@ -6,6 +6,8 @@ import numpy as np
 
 from planemeshforge.abaqus_io.deck_read import read_deck
 from planemeshforge.abaqus_io.deck_write import write_deck
+from planemeshforge.abaqus_io.element_block import ElementBlock
+from planemeshforge.abaqus_io.mesh_io import Mesh
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DECK_PATH_READ = DATA_DIR / "geometry-backup.deck"
@@ -39,6 +41,35 @@ class TestAbaqusDeckIO(unittest.TestCase):
         np.testing.assert_array_almost_equal(
             mesh_data.points, mesh_data_read_back.points
         )
+
+
+class TestSurfaceRoundTrip(unittest.TestCase):
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.deck_path = Path(self._tmpdir.name) / "surfaces.inp"
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def _mesh(self):
+        points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
+        tri = ElementBlock("CGAX3", [1, 2], [[1, 2, 3], [1, 3, 4]])
+        return Mesh(
+            points=points,
+            point_ids=[1, 2, 3, 4],
+            cells=[tri],
+            elem_sets={"elem_set1": [1], "surf2_S1": [2]},
+            surface_sets={"surf1": ["elem_set1"], "surf2": ["surf2_S1", "S1"]},
+        )
+
+    def test_labeled_and_unlabeled_surfaces_round_trip(self):
+        mesh = self._mesh()
+        write_deck(self.deck_path, mesh)
+        mesh_back = read_deck(self.deck_path)
+        self.assertEqual(mesh_back.surface_sets["surf1"], ["elem_set1"])
+        self.assertEqual(mesh_back.surface_sets["surf2"], ["surf2_S1", "S1"])
+        self.assertEqual(mesh_back.elem_sets["elem_set1"], [1])
+        self.assertEqual(mesh_back.elem_sets["surf2_S1"], [2])
 
 
 if __name__ == "__main__":

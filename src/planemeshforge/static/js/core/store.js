@@ -4,6 +4,7 @@
 // asks the server to (see net/client.js) and reacts to the result.
 import { bus } from "./events.js";
 import { SpatialHashGrid } from "./spatial-hash-grid.js";
+import { resolveSurfaceElementIds } from "./surfaces.js";
 
 const EMPTY_MESH = { nodes: [], elements: [], node_sets: {}, element_sets: {}, surface_sets: {} };
 
@@ -18,6 +19,12 @@ class Store {
         this.elementsMap = new Map();
         this.elementsByNode = new Map();
         this.spatialGrid = new SpatialHashGrid({ min: [-1000, -1000] }, [50, 50]);
+
+        // Boundary edges of 2D elements (triangles/quads) - edges used by
+        // exactly one element - the pickable "surfaces". Rebuilt on every
+        // mesh:changed. Keyed by `${elementId}:${faceIndex}`.
+        this.boundaryEdges = [];
+        this.boundaryEdgeMap = new Map();
 
         this.elementTypes = {};
 
@@ -59,6 +66,36 @@ class Store {
         const cell = Math.max(0.5, span / 40);
         this.spatialGrid = new SpatialHashGrid({ min: [minX, minY] }, [cell, cell]);
         for (const node of this.mesh.nodes) this.spatialGrid.insert(node);
+
+        this._reindexBoundaryEdges();
+    }
+
+    _reindexBoundaryEdges() {
+        // Count every edge occurrence across all 2D elements (triangles,
+        // quads); an edge used by exactly one element is a boundary face.
+        const occurrences = new Map(); // sorted node-pair key -> [{elementId, faceIndex}]
+        for (const el of this.mesh.elements) {
+            const n = el.node_ids.length;
+            if (n < 3) continue;
+            for (let i = 0; i < n; i++) {
+                const a = el.node_ids[i];
+                const b = el.node_ids[(i + 1) % n];
+                const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+                if (!occurrences.has(key)) occurrences.set(key, []);
+                occurrences.get(key).push({ elementId: el.id, faceIndex: i, a, b });
+            }
+        }
+
+        this.boundaryEdges = [];
+        this.boundaryEdgeMap = new Map();
+        for (const faces of occurrences.values()) {
+            if (faces.length !== 1) continue;
+            const face = faces[0];
+            const key = `${face.elementId}:${face.faceIndex}`;
+            const edge = { key, elementId: face.elementId, faceIndex: face.faceIndex, a: face.a, b: face.b };
+            this.boundaryEdges.push(edge);
+            this.boundaryEdgeMap.set(key, edge);
+        }
     }
 
     node(id) {
@@ -109,6 +146,10 @@ class Store {
     isElementVisible(elementId) {
         for (const [name, ids] of Object.entries(this.mesh.element_sets)) {
             if (ids.includes(elementId) && this.isSetHidden("element", name)) return false;
+        }
+        for (const [name, tokens] of Object.entries(this.mesh.surface_sets)) {
+            if (!this.isSetHidden("surface", name)) continue;
+            if (resolveSurfaceElementIds(tokens, this.mesh.element_sets).includes(elementId)) return false;
         }
         return true;
     }

@@ -13,6 +13,7 @@ const BINDINGS = [
     { keys: "delete", command: "edit.deleteSelected" },
     { keys: "backspace", command: "edit.deleteSelected" },
     { keys: "v", command: "tool.select" },
+    { keys: "s", command: "tool.selectSurface" },
     { keys: "n", command: "tool.addNode" },
     { keys: "l", command: "tool.createLine" },
     { keys: "t", command: "tool.createTriangle" },

@@ -7,27 +7,54 @@ class Selection {
     constructor() {
         this.nodeIds = new Set();
         this.elementIds = new Set();
+        this.faceKeys = new Set(); // `${elementId}:${faceIndex}` - boundary edges ("surfaces")
     }
 
     clear() {
         this.nodeIds.clear();
         this.elementIds.clear();
+        this.faceKeys.clear();
         this._changed();
     }
 
     isEmpty() {
-        return this.nodeIds.size === 0 && this.elementIds.size === 0;
+        return this.nodeIds.size === 0 && this.elementIds.size === 0 && this.faceKeys.size === 0;
     }
 
     setNodes(ids) {
         this.nodeIds = new Set(ids);
         this.elementIds.clear();
+        this.faceKeys.clear();
         this._changed();
     }
 
     setElements(ids) {
         this.elementIds = new Set(ids);
         this.nodeIds.clear();
+        this.faceKeys.clear();
+        this._changed();
+    }
+
+    setFaces(keys) {
+        this.faceKeys = new Set(keys);
+        this.nodeIds.clear();
+        this.elementIds.clear();
+        this._changed();
+    }
+
+    addFaces(keys) {
+        keys.forEach(key => this.faceKeys.add(key));
+        this._changed();
+    }
+
+    removeFaces(keys) {
+        keys.forEach(key => this.faceKeys.delete(key));
+        this._changed();
+    }
+
+    toggleFace(key) {
+        if (this.faceKeys.has(key)) this.faceKeys.delete(key);
+        else this.faceKeys.add(key);
         this._changed();
     }
 
@@ -56,6 +83,7 @@ class Selection {
     selectAll() {
         this.nodeIds = new Set(store.mesh.nodes.map(n => n.id));
         this.elementIds.clear();
+        this.faceKeys.clear();
         this._changed();
     }
 
@@ -79,6 +107,12 @@ bus.on("mesh:changed", () => {
     for (const id of selection.elementIds) {
         if (!store.elementsMap.has(id)) {
             selection.elementIds.delete(id);
+            changed = true;
+        }
+    }
+    for (const key of selection.faceKeys) {
+        if (!store.boundaryEdgeMap.has(key)) {
+            selection.faceKeys.delete(key);
             changed = true;
         }
     }

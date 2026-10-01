@@ -1,4 +1,5 @@
 import numpy as np
+from .deck_utility import surface_pairs
 from .mesh_io import Mesh
 
 
@@ -82,14 +83,12 @@ def write_buffer(f, mesh: Mesh, comment_line: str = "") -> None:
     f.write("**" + "-" * 78 + "\n")
     f.write("**  SURFACE DEFINITIONS\n")
 
-    for name, sets in mesh.surface_sets.items():
-        if len(sets) > 0:
+    for name, tokens in mesh.surface_sets.items():
+        if len(tokens) > 0:
             f.write(f"*SURFACE, NAME={name}, TYPE=ELEMENT\n")
-            # join the sets with comma
-            output = "\n".join(
-                func_node_line(sets[i : i + 2]) for i in range(0, len(sets), 2)
-            )
-            f.write(output + "\n")
+            for elset_name, label in surface_pairs(tokens):
+                row = [elset_name] if label is None else [elset_name, label]
+                f.write(func_node_line(row) + "\n")
             f.write("**" + "-" * 78 + "\n")
 
     f.flush()

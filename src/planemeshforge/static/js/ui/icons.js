@@ -11,6 +11,7 @@ const PATHS = {
     "undo": '<path d="M3 8a5 5 0 1 1 1.6 3.7"/><path d="M3 8V4"/><path d="M3 8h4"/>',
     "redo": '<path d="M13 8a5 5 0 1 0-1.6 3.7"/><path d="M13 8V4"/><path d="M13 8H9"/>',
     "select": '<path d="M3 3l4.5 10 1.5-4 4-1.5z"/>',
+    "surface": '<path d="M2 13l6-10 6 10z"/><path d="M2 13h12" stroke-width="3"/>',
     "add-node": '<circle cx="8" cy="8" r="2.5"/><path d="M8 1v3"/><path d="M8 12v3"/><path d="M1 8h3"/><path d="M12 8h3"/>',
     "line": '<path d="M3 13L13 3"/><circle cx="3" cy="13" r="1.4"/><circle cx="13" cy="3" r="1.4"/>',
     "triangle": '<path d="M8 3l5 10H3z"/>',
