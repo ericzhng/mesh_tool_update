@@ -7,6 +7,7 @@ from collections import deque
 
 from ..abaqus_io import Mesh
 from . import quality
+from . import topology as topo
 from .ops import OPS
 from .serialize import mesh_summary, mesh_to_dict
 
@@ -27,6 +28,8 @@ class MeshEditor:
         By default this does not go on the undo stack, since it represents a
         new starting point rather than an edit.
         """
+        if mesh is not None:
+            topo.orient_ccw(mesh)
         if record_history:
             self._snapshot()
         else:
@@ -61,6 +64,7 @@ class MeshEditor:
                 if "mesh" in result:
                     self.mesh = result.pop("mesh")
             if self.mesh is not None:
+                topo.orient_ccw(self.mesh)
                 self.mesh._validate_data()
         except Exception as exc:  # noqa: BLE001 - surfaced to the client as an error
             self._undo.pop()

@@ -162,6 +162,13 @@ def merge_nodes(mesh: Mesh, ids: list[int] | None = None, tolerance: float = 1e-
     return {"merged": merge_map}
 
 
+def fix_orientation(mesh: Mesh) -> dict:
+    """Reverses the node order of any clockwise-wound 2D element."""
+    mesh = _require_mesh(mesh)
+    reversed_ids = topo.orient_ccw(mesh)
+    return {"reversed_ids": reversed_ids}
+
+
 def renumber(mesh: Mesh, start: int = 1) -> dict:
     """Renumbers node and element ids sequentially from `start`."""
     mesh = _require_mesh(mesh)
@@ -246,6 +253,7 @@ OPS = {
     "delete_elements": delete_elements,
     "transform": transform,
     "merge_nodes": merge_nodes,
+    "fix_orientation": fix_orientation,
     "renumber": renumber,
     "split_quads": split_quads,
     "triangulate": triangulate,

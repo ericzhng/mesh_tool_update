@@ -167,8 +167,21 @@ export function buildUtilitiesPanel(root) {
 
     // ---- Quality ----
     const quality = section("Mesh Quality");
-    quality.innerHTML += `<div class="btn-row"><button class="btn" id="tool-check">${icon("check-list")}Run Quality Check</button></div><div id="quality-results"></div>`;
+    quality.innerHTML += `<div class="btn-row">
+            <button class="btn" id="tool-check">${icon("check-list")}Run Quality Check</button>
+            <button class="btn" id="tool-fix-winding">${icon("rotate-ccw")}Fix Element Winding</button>
+        </div><div id="quality-results"></div>`;
     root.appendChild(quality);
+
+    quality.querySelector("#tool-fix-winding").addEventListener("click", async () => {
+        const result = await client.op("fix_orientation", {});
+        if (!result.ok) {
+            toast.error(result.error);
+            return;
+        }
+        const n = (result.reversed_ids || []).length;
+        toast[n ? "success" : "info"](n ? `Fixed node winding on ${n} element(s).` : "No inverted elements found.");
+    });
 
     quality.querySelector("#tool-check").addEventListener("click", async () => {
         const result = await client.qualityCheck();

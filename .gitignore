@@ -68,3 +68,5 @@ ENV/
 .DS_Store
 data/mesh_data.json
 temp/*
+
+*dev_data/

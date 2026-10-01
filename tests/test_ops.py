@@ -61,6 +61,19 @@ class TestElementOps(unittest.TestCase):
         self.assertEqual(len(mesh.cells), 1)
         self.assertEqual(mesh.cells[0].element_type, "CGAX3")
 
+    def test_fix_orientation_reverses_clockwise_elements(self):
+        points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+        tri = ElementBlock("CGAX3", [1], [[1, 3, 2]])  # clockwise
+        mesh = Mesh(points=points, point_ids=[1, 2, 3], cells=[tri])
+        result = ops.fix_orientation(mesh)
+        self.assertEqual(result["reversed_ids"], [1])
+        np.testing.assert_array_equal(mesh.cells[0].connectivity[0], [1, 2, 3])
+
+    def test_fix_orientation_no_op_on_clean_mesh(self):
+        mesh = square_mesh()
+        result = ops.fix_orientation(mesh)
+        self.assertEqual(result["reversed_ids"], [])
+
 
 class TestTransform(unittest.TestCase):
     def test_rotate_about_centroid(self):

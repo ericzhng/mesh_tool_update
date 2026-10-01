@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from planemeshforge.abaqus_io import ElementBlock, Mesh
-from planemeshforge.core import MeshEditor
+from planemeshforge.core import MeshEditor, quality
 
 
 def square_mesh():
@@ -74,6 +74,42 @@ class TestMeshEditor(unittest.TestCase):
         self.assertEqual(state["summary"]["num_nodes"], 4)
         self.assertFalse(state["can_undo"])
         self.assertFalse(state["can_redo"])
+
+    def test_add_elements_normalizes_clockwise_winding(self):
+        editor = MeshEditor(square_mesh())
+        result = editor.apply("add_elements", {"element_type": "CGAX3", "connectivity": [[1, 4, 2]]})
+        self.assertTrue(result["ok"])
+        new_block = editor.mesh.cells[0]
+        new_row = new_block.connectivity[list(new_block.ids).index(result["created_ids"][0])]
+        self.assertEqual(quality.check(editor.mesh), [])
+        np.testing.assert_array_equal(new_row, [1, 2, 4])
+
+    def test_mirror_leaves_quality_clean(self):
+        editor = MeshEditor(square_mesh())
+        result = editor.apply(
+            "transform",
+            {"node_ids": [1, 2, 3, 4], "kind": "mirror", "params": {"axis": "y"}},
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(quality.check(editor.mesh), [])
+
+    def test_set_mesh_normalizes_clockwise_winding(self):
+        points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+        tri = ElementBlock("CGAX3", [1], [[1, 3, 2]])  # clockwise
+        mesh = Mesh(points=points, point_ids=[1, 2, 3], cells=[tri])
+
+        editor = MeshEditor()
+        editor.set_mesh(mesh, record_history=False)
+
+        self.assertEqual(quality.check(editor.mesh), [])
+        np.testing.assert_array_equal(editor.mesh.cells[0].connectivity[0], [1, 2, 3])
+
+    def test_undo_after_winding_fix_restores_original_order(self):
+        editor = MeshEditor(square_mesh())
+        before = editor.mesh.copy()
+        editor.apply("add_elements", {"element_type": "CGAX3", "connectivity": [[1, 4, 2]]})
+        self.assertTrue(editor.undo())
+        np.testing.assert_array_equal(editor.mesh.cells[0].connectivity, before.cells[0].connectivity)
 
 
 if __name__ == "__main__":

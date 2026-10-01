@@ -8,6 +8,40 @@ import numpy as np
 from ..abaqus_io import Mesh, ElementBlock
 
 
+def signed_areas(points: np.ndarray, point_ids: list[int], connectivity: np.ndarray) -> np.ndarray:
+    """Shoelace-formula signed area of every row (element) in `connectivity`.
+
+    Positive for counter-clockwise node order, negative for clockwise, zero
+    for degenerate (collinear/coincident) elements.
+    """
+    id_to_index = {pid: i for i, pid in enumerate(point_ids)}
+    indices = np.vectorize(id_to_index.get)(connectivity)
+    x = points[indices, 0]
+    y = points[indices, 1]
+    return 0.5 * np.sum(x * np.roll(y, -1, axis=1) - np.roll(x, -1, axis=1) * y, axis=1)
+
+
+def orient_ccw(mesh: Mesh) -> list[int]:
+    """Reverses the node order of any 2D element wound clockwise, in place.
+
+    Elements with zero area (collinear/coincident nodes) are left untouched
+    since reversing them wouldn't fix anything. Returns the ids of the
+    elements that were reversed.
+    """
+    fixed_ids: list[int] = []
+    for block in mesh.cells:
+        if block.dim != 2 or block.connectivity.size == 0:
+            continue
+        areas = signed_areas(mesh.points, mesh.point_ids, block.connectivity)
+        reverse_mask = areas < 0
+        if not reverse_mask.any():
+            continue
+        conn = block.connectivity[reverse_mask]
+        block.connectivity[reverse_mask] = np.concatenate([conn[:, :1], conn[:, :0:-1]], axis=1)
+        fixed_ids.extend(int(e) for e in block.ids[reverse_mask])
+    return fixed_ids
+
+
 def merge_element_blocks(blocks: list[ElementBlock]) -> list[ElementBlock]:
     """Concatenates blocks into one block per element type.
 

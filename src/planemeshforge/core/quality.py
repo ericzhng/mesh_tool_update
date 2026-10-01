@@ -2,47 +2,46 @@
 
 from __future__ import annotations
 
-import numpy as np
-
 from ..abaqus_io import Mesh
+from .topology import signed_areas
 
 _2D_TYPES = {"CGAX3", "CGAX4"}
-
-
-def _signed_area(coords: np.ndarray) -> float:
-    x, y = coords[:, 0], coords[:, 1]
-    return 0.5 * np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y)
 
 
 def check(mesh: Mesh) -> list[dict]:
     """Returns a list of issues, each `{severity, kind, message, node_ids?, element_id?}`.
 
-    Checks performed: degenerate/inverted 2D elements (non-positive signed
+    Checks performed: inverted/degenerate 2D elements (non-positive signed
     area), duplicate elements (identical connectivity within a block),
     orphan nodes (not referenced by any element).
+
+    Inverted (clockwise-wound) elements are normally prevented by
+    `topology.orient_ccw`, which `MeshEditor` runs after every edit and
+    load, so this mostly only ever flags genuinely degenerate elements.
     """
     if not mesh:
         return []
 
     issues: list[dict] = []
-    id_to_index = {pid: i for i, pid in enumerate(mesh.point_ids)}
     used_nodes: set[int] = set()
 
     for block in mesh.cells:
         seen_conn: dict[tuple, int] = {}
+        areas = signed_areas(mesh.points, mesh.point_ids, block.connectivity) if block.element_type in _2D_TYPES else None
         for i, eid in enumerate(block.ids):
             conn = [int(n) for n in block.connectivity[i]]
             used_nodes.update(conn)
 
-            if block.element_type in _2D_TYPES:
-                coords = mesh.points[[id_to_index[n] for n in conn], :2]
-                area = _signed_area(coords)
+            if areas is not None:
+                area = areas[i]
                 if area <= 0:
+                    kind = "inverted_element" if area < 0 else "degenerate_element"
+                    detail = "non-positive area" if area < 0 else "zero area (collinear/coincident nodes)"
                     issues.append(
                         {
                             "severity": "error",
-                            "kind": "inverted_element" if area < 0 else "degenerate_element",
-                            "message": f"Element {int(eid)} ({block.element_type}) has non-positive area ({area:.6g}).",
+                            "kind": kind,
+                            "message": f"Element {int(eid)} ({block.element_type}) has {detail} ({area:.6g}).",
                             "element_id": int(eid),
                             "node_ids": conn,
                         }
