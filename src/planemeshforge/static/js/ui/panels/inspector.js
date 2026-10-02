@@ -5,9 +5,26 @@ import { bus } from "../../core/events.js";
 import { store } from "../../core/store.js";
 import { selection } from "../../core/selection.js";
 import { boundingBox, signedArea } from "../../core/geometry.js";
+import { qualityOverlay } from "../../core/quality-overlay.js";
 import * as client from "../../net/client.js";
 import { toast } from "../toast.js";
 import { icon } from "../icons.js";
+
+function fmtMetric(n) {
+    return n == null ? "–" : n.toFixed(3);
+}
+
+// Metrics (skewness/aspect ratio) come from Utilities > Mesh Metrics, which
+// computes them for the whole mesh at once. Selecting an element before
+// that's run shouldn't just show nothing, so lazily trigger the same
+// mesh-wide computation the quality tooltip uses - `quality:changed` then
+// re-renders this panel with the real numbers once it resolves.
+let computingMetrics = false;
+function ensureMetricsComputed() {
+    if (computingMetrics || qualityOverlay.elements.length) return;
+    computingMetrics = true;
+    qualityOverlay.compute().finally(() => (computingMetrics = false));
+}
 
 function section(title) {
     const el = document.createElement("div");
@@ -66,6 +83,21 @@ function renderSingleElement(root, elementId) {
         ${area !== null ? `<div class="field-row"><label>Area</label><input type="text" value="${area.toFixed(4)}" disabled></div>` : ""}
     `;
     root.appendChild(info);
+
+    const metrics = qualityOverlay.metricsFor(elementId);
+    const limits = qualityOverlay.limits;
+    const skewFlag = metrics != null && metrics.skewness >= limits.skewnessBad ? "flagged bad" : metrics != null && metrics.skewness >= limits.skewnessWarn ? "flagged" : "";
+    const aspectBad = metrics?.aspect_ratio != null && metrics.aspect_ratio >= limits.aspectRatioBad;
+    const aspectWarn = metrics?.aspect_ratio != null && metrics.aspect_ratio >= limits.aspectRatioWarn;
+    const aspectFlag = aspectBad ? "flagged bad" : aspectWarn ? "flagged" : "";
+
+    const quality = section("Quality");
+    quality.innerHTML += `
+        <div class="field-row"><label>Skew</label><input type="text" class="${skewFlag}" value="${fmtMetric(metrics?.skewness)}" disabled></div>
+        <div class="field-row"><label>Aspect</label><input type="text" class="${aspectFlag}" value="${fmtMetric(metrics?.aspect_ratio)}" disabled></div>
+    `;
+    root.appendChild(quality);
+    if (!metrics) ensureMetricsComputed();
 
     const nodesSection = section("Nodes");
     element.node_ids.forEach(nid => {
@@ -134,5 +166,6 @@ export function buildInspectorPanel(root) {
 
     bus.on("selection:changed", render);
     bus.on("mesh:changed", render);
+    bus.on("quality:changed", render);
     render();
 }

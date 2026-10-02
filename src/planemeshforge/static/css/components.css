@@ -261,6 +261,8 @@ button {
     color: var(--text-primary);
     font-size: var(--font-size-sm);
 }
+.field-row input.flagged { color: var(--warning); font-weight: 600; }
+.field-row input.flagged.bad { color: var(--danger); }
 .field-row input:focus, .field-row select:focus {
     outline: 2px solid var(--accent);
     outline-offset: -1px;
