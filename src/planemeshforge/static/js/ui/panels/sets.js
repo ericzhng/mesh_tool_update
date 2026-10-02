@@ -83,23 +83,32 @@ function setRow({ kind, name, count, onSelect, showVisibility, showEdit }) {
     return row;
 }
 
-function group(title, rows) {
-    const details = document.createElement("details");
-    details.className = "set-group";
-    details.open = true;
-    details.innerHTML = `<summary>${title} (${rows.length})</summary>`;
-    if (!rows.length) {
-        const empty = document.createElement("div");
-        empty.className = "empty-hint";
-        empty.textContent = "None";
-        details.appendChild(empty);
-    } else {
-        rows.forEach(row => details.appendChild(row));
-    }
-    return details;
-}
-
 export function buildSetsPanel(root) {
+    // Each group's collapsed/expanded state must survive `render()`, since
+    // that re-runs on every selection/mesh change (e.g. clicking a set row
+    // selects its members) - otherwise collapsing one group would pop back
+    // open as soon as you clicked anything else in the panel.
+    const openGroups = { "Node Sets": true, "Element Sets": true, "Surface Sets": true };
+
+    function group(title, rows) {
+        const details = document.createElement("details");
+        details.className = "set-group";
+        details.open = openGroups[title];
+        details.innerHTML = `<summary>${title} (${rows.length})</summary>`;
+        details.addEventListener("toggle", () => {
+            openGroups[title] = details.open;
+        });
+        if (!rows.length) {
+            const empty = document.createElement("div");
+            empty.className = "empty-hint";
+            empty.textContent = "None";
+            details.appendChild(empty);
+        } else {
+            rows.forEach(row => details.appendChild(row));
+        }
+        return details;
+    }
+
     function render() {
         root.innerHTML = "";
 
