@@ -215,6 +215,7 @@ button {
 
 .dock-panel {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: var(--space-3);
     display: none;
@@ -482,9 +483,31 @@ button {
     width: 320px;
     max-width: 90vw;
 }
+.dialog.dialog-wide {
+    width: 560px;
+}
 .dialog h2 {
     margin: 0 0 var(--space-3);
     font-size: var(--font-size-lg);
+}
+.dialog .field-row-textarea {
+    align-items: flex-start;
+}
+.dialog .field-row-textarea textarea {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    resize: vertical;
+}
+.dialog .field-row-textarea textarea:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
 }
 .dialog .btn-row {
     justify-content: flex-end;

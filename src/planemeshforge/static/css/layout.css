@@ -26,7 +26,12 @@ html, body {
 #menubar { grid-area: menubar; }
 #tool-rail { grid-area: toolrail; }
 #canvas-area { grid-area: canvas; position: relative; overflow: hidden; }
-#dock { grid-area: dock; }
+/* Grid/flex items default to min-height: auto, which lets them grow to fit
+   their content instead of respecting the grid row's height - so a long
+   Sets list would stretch #dock taller than the viewport (clipped by
+   `body { overflow: hidden }`) instead of letting .dock-panel's own
+   `overflow-y: auto` scroll. min-height: 0 makes it respect the track. */
+#dock { grid-area: dock; min-height: 0; }
 #status-bar { grid-area: statusbar; }
 
 #canvas-area canvas {

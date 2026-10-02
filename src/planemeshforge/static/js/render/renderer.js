@@ -148,19 +148,24 @@ function drawEdge(ctx, edge, style) {
 // the Select Surface tool is active. Hovered and selected edges draw over
 // the default pass in bolder styles, in that order, so selection always
 // wins visually. A surface set's own hide/isolate only ever affects this
-// pass, never the owning element's rendering in `drawElements` - a hidden/
-// isolated-out edge still draws, in `EntityState.GHOST` style, rather than
+// pass, never the owning element's rendering in `drawElements`. Hiding a
+// set draws its edges dim/dashed (`EntityState.GHOST`) rather than
 // vanishing, since the element's own border would otherwise retrace the
 // exact same line and make the hide toggle look like it did nothing.
+// Isolating a set is the opposite: every *other* edge keeps its normal
+// appearance (no dimming) and only the isolated set's own edges are
+// highlighted (`EntityState.ISOLATED`), so isolate reads as "point out
+// this set" rather than "hide everything else".
 function drawEdgeFaces(ctx) {
     ctx.save();
-    // Only the ghost state needs its own pass here - the element's own
-    // border (drawElements) already traces the default line for every
-    // other surface edge, Abaqus-style thin dark edges.
+    // Only the ghost/isolated states need their own pass here - the
+    // element's own border (drawElements) already traces the default line
+    // for every other surface edge, Abaqus-style thin dark edges.
     for (const edge of store.edgeFaces) {
         if (!store.isElementVisible(edge.elementId)) continue;
         if (selection.faceKeys.has(edge.key) || hover.faceKey === edge.key) continue;
         if (store.isEdgeGhosted(edge)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.GHOST));
+        else if (store.isEdgeIsolated(edge)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.ISOLATED));
     }
     // Gate on the element alone (not the stricter isEdgeVisible) so a
     // selected edge keeps showing even if its surface set gets hidden
@@ -178,14 +183,17 @@ function drawEdgeFaces(ctx) {
 
 // Abaqus hides node markers by default and only reveals them on demand -
 // otherwise every node dot competes visually with the element fill/edges.
-// A node is drawn when: it's hovered/selected directly, it has no owning
-// element (otherwise a freshly placed free node would be invisible), or
-// the active tool opts into always showing nodes (e.g. element-creation
+// A node is drawn when: it's hovered/selected directly, its node set is the
+// isolated one (Sets panel - isolating is the only way to see a node set's
+// members in the view, since there's no per-set hide for nodes), it has no
+// owning element (otherwise a freshly placed free node would be invisible),
+// or the active tool opts into always showing nodes (e.g. element-creation
 // tools, which need every pickable node visible). Hovering an element only
 // highlights the element itself, not its corner nodes.
-function isNodeRevealed(nodeId) {
+function isNodeRevealed(nodeId, isolatedNodeIds) {
     if (viewport.showAllNodes) return true;
     if (selection.nodeIds.has(nodeId) || hover.nodeId === nodeId) return true;
+    if (isolatedNodeIds?.has(nodeId)) return true;
     if (!store.elementsByNode.has(nodeId)) return true;
     return false;
 }
@@ -193,13 +201,22 @@ function isNodeRevealed(nodeId) {
 function drawNodes(ctx) {
     ctx.save();
     const radius = Math.max(2.5, Math.min(6, viewport.scale * 0.12));
+    const isolatedNodeIds =
+        store.isolatedSet?.kind === "node" ? new Set(store.mesh.node_sets[store.isolatedSet.name] || []) : null;
     for (const node of store.mesh.nodes) {
         if (!store.isNodeVisible(node.id)) continue;
-        if (!isNodeRevealed(node.id)) continue;
+        if (!isNodeRevealed(node.id, isolatedNodeIds)) continue;
         const p = viewport.toScreen(node);
         const isSelected = selection.nodeIds.has(node.id);
         const isHovered = !isSelected && hover.nodeId === node.id;
-        const state = isSelected ? EntityState.SELECTED : isHovered ? EntityState.HOVER : EntityState.DEFAULT;
+        const isIsolated = !isSelected && !isHovered && isolatedNodeIds?.has(node.id);
+        const state = isSelected
+            ? EntityState.SELECTED
+            : isHovered
+              ? EntityState.HOVER
+              : isIsolated
+                ? EntityState.ISOLATED
+                : EntityState.DEFAULT;
         const style = nodeStyle(state);
 
         ctx.beginPath();

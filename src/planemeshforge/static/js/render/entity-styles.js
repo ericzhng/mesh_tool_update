@@ -12,6 +12,11 @@
 //              its element remains visible - AutoCAD/SolidWorks draw
 //              suppressed/hidden edges the same way instead of just
 //              deleting them from view).
+//   - isolated: the members of the currently-isolated node or surface set
+//              (Sets panel), in the same orange as hover - a node set's
+//              nodes are otherwise hidden by default, and a surface set's
+//              edges otherwise look identical to any other element border,
+//              so isolating one needs its own visible highlight.
 // Each draw pass in renderer.js resolves ONE of these per entity per frame
 // and asks here for the concrete colors/widths, instead of hand-rolling its
 // own ternaries - keeps the three passes (elements/edges/nodes) visually in
@@ -21,6 +26,7 @@ export const EntityState = Object.freeze({
     HOVER: "hover",
     SELECTED: "selected",
     GHOST: "ghost",
+    ISOLATED: "isolated",
     // Shape-quality overlay (Utilities > Mesh Quality > Highlight in view):
     // flags elements whose skewness/aspect-ratio crosses the warn/bad limit.
     QUALITY_WARN: "quality-warn",
@@ -37,6 +43,8 @@ export function nodeStyle(state) {
             return { color: cssVar("--node-selected"), radiusDelta: 1.5 };
         case EntityState.HOVER:
             return { color: cssVar("--hover-highlight"), radiusDelta: 1 };
+        case EntityState.ISOLATED:
+            return { color: cssVar("--isolate-highlight"), radiusDelta: 1 };
         default:
             return { color: cssVar("--node-color"), radiusDelta: 0 };
     }
@@ -63,6 +71,11 @@ export function edgeFaceStyle(state) {
             return { stroke: cssVar("--node-selected"), width: 3.5, dashed: false, alpha: 1 };
         case EntityState.HOVER:
             return { stroke: cssVar("--hover-highlight"), width: 2.5, dashed: false, alpha: 1 };
+        case EntityState.ISOLATED:
+            // The isolated surface set's own edges, drawn bold over the
+            // element's plain border so the set reads clearly against the
+            // rest of the mesh.
+            return { stroke: cssVar("--isolate-highlight"), width: 3, dashed: false, alpha: 1 };
         case EntityState.GHOST:
             // Thick and dashed, at near-full opacity, so it reads clearly
             // on top of the element's own (thin, solid) border - a thin

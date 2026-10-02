@@ -1,18 +1,21 @@
 // Generic modal form, used by the Utilities panel for anything that needs
 // more than a click (transform amounts, merge tolerance, set names, ...).
-export function openDialog({ title, fields, submitLabel = "OK" }) {
+// Pass `wide: true` for forms that need more room (e.g. a textarea field
+// for editing a long id list) - the default size stays compact so it
+// doesn't look oversized for a single short text field.
+export function openDialog({ title, fields, submitLabel = "OK", wide = false }) {
     return new Promise(resolve => {
         const backdrop = document.createElement("div");
         backdrop.className = "dialog-backdrop";
 
         const dialog = document.createElement("div");
-        dialog.className = "dialog";
+        dialog.className = wide ? "dialog dialog-wide" : "dialog";
         dialog.innerHTML = `<h2>${title}</h2>`;
 
         const inputs = {};
         for (const field of fields) {
             const row = document.createElement("div");
-            row.className = "field-row";
+            row.className = field.type === "textarea" ? "field-row field-row-textarea" : "field-row";
             const label = document.createElement("label");
             label.textContent = field.label;
             row.appendChild(label);
@@ -26,6 +29,9 @@ export function openDialog({ title, fields, submitLabel = "OK" }) {
                     optionEl.textContent = opt.label;
                     input.appendChild(optionEl);
                 }
+            } else if (field.type === "textarea") {
+                input = document.createElement("textarea");
+                input.rows = field.rows || 8;
             } else {
                 input = document.createElement("input");
                 input.type = field.type || "text";
@@ -66,7 +72,11 @@ export function openDialog({ title, fields, submitLabel = "OK" }) {
             close(values);
         });
         dialog.addEventListener("keydown", e => {
-            if (e.key === "Enter") submitBtn.click();
+            // In a textarea, Enter has to stay a newline (that's the whole
+            // point of giving a field multiple rows) - submit on Ctrl/Cmd+
+            // Enter there instead, same convention as chat/comment boxes.
+            const inTextarea = e.target.tagName === "TEXTAREA";
+            if (e.key === "Enter" && (!inTextarea || e.ctrlKey || e.metaKey)) submitBtn.click();
             if (e.key === "Escape") close(null);
         });
 

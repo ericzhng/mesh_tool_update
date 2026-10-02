@@ -61,6 +61,7 @@
     --element-selected-fill: #f0645a;
     --element-hover-fill: #8fd48f;
     --hover-highlight: #ff8c00;
+    --isolate-highlight: #ff8c00;
     --quality-warn-fill: rgba(184, 134, 11, 0.18);
     --quality-warn-stroke: #b8860b;
     --quality-bad-fill: rgba(209, 55, 63, 0.2);
@@ -103,6 +104,7 @@
     --element-selected-fill: #d9483f;
     --element-hover-fill: #5fae5f;
     --hover-highlight: #ffa024;
+    --isolate-highlight: #ffa024;
     --quality-warn-fill: rgba(217, 165, 42, 0.22);
     --quality-warn-stroke: #d9a52a;
     --quality-bad-fill: rgba(239, 90, 98, 0.24);

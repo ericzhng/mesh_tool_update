@@ -176,23 +176,35 @@ class Store {
         return this.isElementVisible(edge.elementId) && !this._isEdgeExcludedBySurfaceSets(edge);
     }
 
-    // True when the edge's own surface set is hidden/isolated-out, but its
+    // True when the edge's own surface set is hidden (not isolated-out -
+    // that case highlights the isolated set instead, see isEdgeIsolated,
+    // and leaves every other edge's normal appearance alone), but its
     // element is otherwise visible - the renderer draws these as a dim
     // "ghost" (there, but turned off) instead of just vanishing, since the
     // element's own border would otherwise retrace the exact same line and
     // make the hide toggle look like it did nothing.
     isEdgeGhosted(edge) {
+        if (this.isolatedSet?.kind === "surface") return false;
         return this.isElementVisible(edge.elementId) && this._isEdgeExcludedBySurfaceSets(edge);
+    }
+
+    // True when a surface set is isolated and this edge is one of its
+    // members - the renderer highlights these in the isolate color instead
+    // of letting them blend into the element's own plain border.
+    isEdgeIsolated(edge) {
+        if (this.isolatedSet?.kind !== "surface") return false;
+        const tokens = this.mesh.surface_sets[this.isolatedSet.name] || [];
+        return resolveSurfaceFaces(tokens, this.mesh.element_sets, this.edgeFaces).includes(edge.key);
     }
 
     _isEdgeExcludedBySurfaceSets(edge) {
         if (this.isolatedSet?.kind === "surface") {
             const tokens = this.mesh.surface_sets[this.isolatedSet.name] || [];
-            return !resolveSurfaceFaces(tokens, this.mesh.element_sets).includes(edge.key);
+            return !resolveSurfaceFaces(tokens, this.mesh.element_sets, this.edgeFaces).includes(edge.key);
         }
         for (const [name, tokens] of Object.entries(this.mesh.surface_sets)) {
             if (!this.isSetHidden("surface", name)) continue;
-            if (resolveSurfaceFaces(tokens, this.mesh.element_sets).includes(edge.key)) return true;
+            if (resolveSurfaceFaces(tokens, this.mesh.element_sets, this.edgeFaces).includes(edge.key)) return true;
         }
         return false;
     }
