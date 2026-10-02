@@ -1,8 +1,9 @@
-// Picks boundary edges of 2D elements ("surfaces") - click to pick one, box
-// or Alt+drag lasso to pick several at once. Selected faces can be saved as
-// a named surface set from the Sets panel.
+// Picks edges of 2D elements - boundary or internal - ("surfaces") - click
+// to pick one, box or Alt+drag lasso to pick several at once. Selected
+// faces can be saved as a named surface set from the Sets panel.
 import { store } from "../core/store.js";
 import { selection } from "../core/selection.js";
+import { hover } from "../core/hover.js";
 import { viewport } from "../render/viewport.js";
 import { pointInPolygon } from "../core/geometry.js";
 import { hitEdge, pickRadiusWorld } from "../core/hit-test.js";
@@ -11,9 +12,13 @@ export const selectSurfaceTool = {
     id: "select-surface",
     label: "Select Surface",
     cursor: "default",
-    hint: "Click a boundary edge to select · box/Alt+drag to lasso · Shift adds · Ctrl toggles",
+    hint: "Click an edge to select · box/Alt+drag to lasso · Shift adds · Ctrl toggles",
 
     _box: null, // { start, current, lasso: bool, points: [] }
+
+    onDeactivate() {
+        hover.clear();
+    },
 
     onPointerDown(e, world) {
         const edge = hitEdge(world);
@@ -32,7 +37,12 @@ export const selectSurfaceTool = {
     },
 
     onPointerMove(e, world) {
-        if (!this._box) return;
+        if (!this._box) {
+            const edge = hitEdge(world);
+            if (edge) hover.setFace(edge.key);
+            else hover.clear();
+            return;
+        }
         this._box.current = world;
         if (this._box.lasso) this._box.points.push(world);
     },
@@ -49,8 +59,8 @@ export const selectSurfaceTool = {
         if (!moved) return;
 
         const within = point => (box.lasso ? pointInPolygon(point, box.points) : inBox(point, box));
-        const hits = store.boundaryEdges.filter(edge => {
-            if (!store.isElementVisible(edge.elementId)) return false;
+        const hits = store.edgeFaces.filter(edge => {
+            if (!store.isEdgeVisible(edge)) return false;
             const a = store.node(edge.a);
             const b = store.node(edge.b);
             return a && b && within(a) && within(b);
@@ -77,7 +87,6 @@ export const selectSurfaceTool = {
     },
 
     drawOverlay(ctx) {
-        this._drawPickableEdges(ctx);
         if (!this._box) return;
         ctx.save();
         ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent") || "#1f6feb";
@@ -101,26 +110,6 @@ export const selectSurfaceTool = {
             ctx.fillRect(x, y, w, h);
             ctx.globalAlpha = 1;
             ctx.strokeRect(x, y, w, h);
-        }
-        ctx.restore();
-    },
-
-    _drawPickableEdges(ctx) {
-        ctx.save();
-        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-secondary") || "#888";
-        ctx.globalAlpha = 0.35;
-        ctx.lineWidth = 2;
-        for (const edge of store.boundaryEdges) {
-            if (selection.faceKeys.has(edge.key) || !store.isElementVisible(edge.elementId)) continue;
-            const a = store.node(edge.a);
-            const b = store.node(edge.b);
-            if (!a || !b) continue;
-            const pa = viewport.toScreen(a);
-            const pb = viewport.toScreen(b);
-            ctx.beginPath();
-            ctx.moveTo(pa.x, pa.y);
-            ctx.lineTo(pb.x, pb.y);
-            ctx.stroke();
         }
         ctx.restore();
     },

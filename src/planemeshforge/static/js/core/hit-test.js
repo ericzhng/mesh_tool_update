@@ -41,14 +41,16 @@ export function hitElement(world, radiusPx = DEFAULT_PICK_RADIUS_PX) {
     return null;
 }
 
-// Picks the nearest boundary edge ("surface") of a 2D element - an edge used
-// by exactly one triangle/quad, per `store.boundaryEdges`.
+// Picks the nearest pickable edge ("surface") of a 2D element - boundary or
+// internal - per `store.edgeFaces`. When an internal edge is shared by two
+// elements, both sides are candidates; the nearer one wins ties by whichever
+// comes first in `edgeFaces` (lower element id).
 export function hitEdge(world, radiusPx = DEFAULT_PICK_RADIUS_PX) {
     const r = pickRadiusWorld(radiusPx);
     let best = null;
     let bestDist = Infinity;
-    for (const edge of store.boundaryEdges) {
-        if (!store.isElementVisible(edge.elementId)) continue;
+    for (const edge of store.edgeFaces) {
+        if (!store.isEdgeVisible(edge)) continue;
         const a = store.node(edge.a);
         const b = store.node(edge.b);
         if (!a || !b) continue;

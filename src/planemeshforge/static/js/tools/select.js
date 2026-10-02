@@ -4,6 +4,7 @@
 // once, on release.
 import { store } from "../core/store.js";
 import { selection } from "../core/selection.js";
+import { hover } from "../core/hover.js";
 import { viewport } from "../render/viewport.js";
 import * as client from "../net/client.js";
 import { pointInPolygon } from "../core/geometry.js";
@@ -17,6 +18,10 @@ export const selectTool = {
 
     _drag: null, // { nodeIds, starts: Map(id -> {x,y}), pointerStart }
     _box: null, // { start, current, lasso: bool, points: [] }
+
+    onDeactivate() {
+        hover.clear();
+    },
 
     onPointerDown(e, world) {
         const node = hitNode(world);
@@ -59,6 +64,16 @@ export const selectTool = {
     },
 
     onPointerMove(e, world) {
+        if (!this._drag && !this._box) {
+            const node = hitNode(world);
+            if (node) {
+                hover.setNode(node.id);
+            } else {
+                const element = hitElement(world);
+                if (element) hover.setElement(element.id);
+                else hover.clear();
+            }
+        }
         if (this._drag) {
             const dx = world.x - this._drag.pointerStart.x;
             const dy = world.y - this._drag.pointerStart.y;

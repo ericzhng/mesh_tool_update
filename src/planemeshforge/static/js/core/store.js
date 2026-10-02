@@ -4,7 +4,7 @@
 // asks the server to (see net/client.js) and reacts to the result.
 import { bus } from "./events.js";
 import { SpatialHashGrid } from "./spatial-hash-grid.js";
-import { resolveSurfaceElementIds } from "./surfaces.js";
+import { resolveSurfaceFaces } from "./surfaces.js";
 
 const EMPTY_MESH = { nodes: [], elements: [], node_sets: {}, element_sets: {}, surface_sets: {} };
 
@@ -20,11 +20,14 @@ class Store {
         this.elementsByNode = new Map();
         this.spatialGrid = new SpatialHashGrid({ min: [-1000, -1000] }, [50, 50]);
 
-        // Boundary edges of 2D elements (triangles/quads) - edges used by
-        // exactly one element - the pickable "surfaces". Rebuilt on every
-        // mesh:changed. Keyed by `${elementId}:${faceIndex}`.
-        this.boundaryEdges = [];
-        this.boundaryEdgeMap = new Map();
+        // Every edge of every 2D element (triangle/quad), one entry per
+        // owning element - a boundary edge (used by exactly one element)
+        // yields one entry, an internal edge shared by two elements yields
+        // two (one per side, since Abaqus surfaces reference a specific
+        // element face). These are the pickable "surfaces". Rebuilt on
+        // every mesh:changed. Keyed by `${elementId}:${faceIndex}`.
+        this.edgeFaces = [];
+        this.edgeFaceMap = new Map();
 
         this.elementTypes = {};
 
@@ -67,12 +70,14 @@ class Store {
         this.spatialGrid = new SpatialHashGrid({ min: [minX, minY] }, [cell, cell]);
         for (const node of this.mesh.nodes) this.spatialGrid.insert(node);
 
-        this._reindexBoundaryEdges();
+        this._reindexEdgeFaces();
     }
 
-    _reindexBoundaryEdges() {
-        // Count every edge occurrence across all 2D elements (triangles,
-        // quads); an edge used by exactly one element is a boundary face.
+    _reindexEdgeFaces() {
+        // Group every edge occurrence across all 2D elements (triangles,
+        // quads) by its node pair, so each occurrence can be flagged
+        // boundary (used by exactly one element) or internal (shared by
+        // two) - both are kept as separately pickable element faces.
         const occurrences = new Map(); // sorted node-pair key -> [{elementId, faceIndex}]
         for (const el of this.mesh.elements) {
             const n = el.node_ids.length;
@@ -86,15 +91,16 @@ class Store {
             }
         }
 
-        this.boundaryEdges = [];
-        this.boundaryEdgeMap = new Map();
+        this.edgeFaces = [];
+        this.edgeFaceMap = new Map();
         for (const faces of occurrences.values()) {
-            if (faces.length !== 1) continue;
-            const face = faces[0];
-            const key = `${face.elementId}:${face.faceIndex}`;
-            const edge = { key, elementId: face.elementId, faceIndex: face.faceIndex, a: face.a, b: face.b };
-            this.boundaryEdges.push(edge);
-            this.boundaryEdgeMap.set(key, edge);
+            const boundary = faces.length === 1;
+            for (const face of faces) {
+                const key = `${face.elementId}:${face.faceIndex}`;
+                const edge = { key, elementId: face.elementId, faceIndex: face.faceIndex, a: face.a, b: face.b, boundary };
+                this.edgeFaces.push(edge);
+                this.edgeFaceMap.set(key, edge);
+            }
         }
     }
 
@@ -113,8 +119,10 @@ class Store {
     }
 
     isSetHidden(kind, name) {
-        if (this.isolatedSet) {
-            return !(this.isolatedSet.kind === kind && this.isolatedSet.name === name);
+        // Isolate only ever affects sets of its own kind - isolating a
+        // surface set must not hide an unrelated node set, and vice versa.
+        if (this.isolatedSet && this.isolatedSet.kind === kind) {
+            return this.isolatedSet.name !== name;
         }
         return this.hiddenSets.has(this.setKey(kind, name));
     }
@@ -137,6 +145,11 @@ class Store {
     }
 
     isNodeVisible(nodeId) {
+        // True isolate (Blender's "hide unselected"): show only members of
+        // the isolated set, not just "un-hide the other named sets".
+        if (this.isolatedSet?.kind === "node") {
+            return (this.mesh.node_sets[this.isolatedSet.name] || []).includes(nodeId);
+        }
         for (const [name, ids] of Object.entries(this.mesh.node_sets)) {
             if (ids.includes(nodeId) && this.isSetHidden("node", name)) return false;
         }
@@ -144,14 +157,44 @@ class Store {
     }
 
     isElementVisible(elementId) {
+        // Surface sets are edges, not elements - hiding/isolating one must
+        // only affect the edge line itself (see isEdgeVisible), never the
+        // element(s) it belongs to.
+        if (this.isolatedSet?.kind === "element") {
+            return (this.mesh.element_sets[this.isolatedSet.name] || []).includes(elementId);
+        }
         for (const [name, ids] of Object.entries(this.mesh.element_sets)) {
             if (ids.includes(elementId) && this.isSetHidden("element", name)) return false;
         }
+        return true;
+    }
+
+    // A pickable element face (from `edgeFaces`/`edgeFaceMap`) is visible
+    // when its owning element is visible, and it isn't hidden/excluded by
+    // surface-set hide or isolate.
+    isEdgeVisible(edge) {
+        return this.isElementVisible(edge.elementId) && !this._isEdgeExcludedBySurfaceSets(edge);
+    }
+
+    // True when the edge's own surface set is hidden/isolated-out, but its
+    // element is otherwise visible - the renderer draws these as a dim
+    // "ghost" (there, but turned off) instead of just vanishing, since the
+    // element's own border would otherwise retrace the exact same line and
+    // make the hide toggle look like it did nothing.
+    isEdgeGhosted(edge) {
+        return this.isElementVisible(edge.elementId) && this._isEdgeExcludedBySurfaceSets(edge);
+    }
+
+    _isEdgeExcludedBySurfaceSets(edge) {
+        if (this.isolatedSet?.kind === "surface") {
+            const tokens = this.mesh.surface_sets[this.isolatedSet.name] || [];
+            return !resolveSurfaceFaces(tokens, this.mesh.element_sets).includes(edge.key);
+        }
         for (const [name, tokens] of Object.entries(this.mesh.surface_sets)) {
             if (!this.isSetHidden("surface", name)) continue;
-            if (resolveSurfaceElementIds(tokens, this.mesh.element_sets).includes(elementId)) return false;
+            if (resolveSurfaceFaces(tokens, this.mesh.element_sets).includes(edge.key)) return true;
         }
-        return true;
+        return false;
     }
 }
 

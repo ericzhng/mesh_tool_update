@@ -111,7 +111,7 @@ bus.on("mesh:changed", () => {
         }
     }
     for (const key of selection.faceKeys) {
-        if (!store.boundaryEdgeMap.has(key)) {
+        if (!store.edgeFaceMap.has(key)) {
             selection.faceKeys.delete(key);
             changed = true;
         }

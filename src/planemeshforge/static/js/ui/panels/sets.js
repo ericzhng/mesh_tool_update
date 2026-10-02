@@ -3,11 +3,10 @@
 // `*SURFACE, TYPE=ELEMENT` tokens - a direct element id or (for sets
 // imported from a deck) a reference to a named element set, each optionally
 // followed by a face label like `S1`. `resolveSurfaceFaces` turns the
-// labeled ones back into boundary-edge keys for highlighting; legacy
-// imported surfaces without face labels fall back to highlighting their
-// elements. Hiding/isolating a surface set hides/isolates the elements its
-// faces belong to (`store.isElementVisible` resolves surface_sets the same
-// way it resolves element_sets).
+// labeled ones back into edge-face keys for highlighting; legacy imported
+// surfaces without face labels fall back to highlighting their elements.
+// Hiding/isolating a surface set only affects the edge line itself
+// (`store.isEdgeVisible`), never the owning element's own rendering.
 import { bus } from "../../core/events.js";
 import { store } from "../../core/store.js";
 import { selection } from "../../core/selection.js";
