@@ -37,16 +37,6 @@ function setRow({ kind, name, count, onSelect, showVisibility, showEdit }) {
     row.appendChild(countEl);
 
     if (showVisibility) {
-        const hidden = store.isSetHidden(kind, name);
-        const eyeBtn = document.createElement("button");
-        eyeBtn.title = hidden ? "Show" : "Hide";
-        eyeBtn.innerHTML = icon(hidden ? "eye-off" : "eye");
-        eyeBtn.addEventListener("click", () => {
-            store.toggleSetVisibility(kind, name);
-            scheduleDraw();
-        });
-        row.appendChild(eyeBtn);
-
         const isolateBtn = document.createElement("button");
         isolateBtn.title = "Isolate";
         isolateBtn.className = store.isolatedSet?.kind === kind && store.isolatedSet?.name === name ? "active" : "";
@@ -56,6 +46,16 @@ function setRow({ kind, name, count, onSelect, showVisibility, showEdit }) {
             scheduleDraw();
         });
         row.appendChild(isolateBtn);
+
+        const hidden = store.isSetHidden(kind, name);
+        const eyeBtn = document.createElement("button");
+        eyeBtn.title = hidden ? "Show" : "Hide";
+        eyeBtn.innerHTML = icon(hidden ? "eye-off" : "eye");
+        eyeBtn.addEventListener("click", () => {
+            store.toggleSetVisibility(kind, name);
+            scheduleDraw();
+        });
+        row.appendChild(eyeBtn);
     }
 
     if (!showEdit) return row;

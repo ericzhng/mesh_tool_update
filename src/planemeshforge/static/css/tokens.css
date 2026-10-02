@@ -59,6 +59,7 @@
     --element-fill: rgba(31, 111, 235, 0.08);
     --element-stroke: #4d5a6b;
     --element-selected-fill: rgba(255, 138, 0, 0.22);
+    --element-hover-fill: rgba(255, 194, 102, 0.2);
     --hover-highlight: #ffc266;
     --grid-line: #e6eaf0;
     --grid-line-strong: #d0d7e2;
@@ -96,6 +97,7 @@
     --element-fill: rgba(76, 141, 255, 0.12);
     --element-stroke: #aeb9c9;
     --element-selected-fill: rgba(255, 171, 61, 0.26);
+    --element-hover-fill: rgba(255, 214, 153, 0.22);
     --hover-highlight: #ffd699;
     --grid-line: #1e2530;
     --grid-line-strong: #2a3342;

@@ -6,6 +6,7 @@ import { store } from "../core/store.js";
 import { selection } from "../core/selection.js";
 import { hover } from "../core/hover.js";
 import { viewport } from "./viewport.js";
+import { EntityState, cssVar, nodeStyle, elementStyle, edgeFaceStyle } from "./entity-styles.js";
 
 const LABEL_SCALE_THRESHOLD = 18;
 let toolOverlayFn = null;
@@ -22,10 +23,6 @@ export function scheduleDraw() {
         scheduled = false;
         draw();
     });
-}
-
-function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 function drawGrid(ctx) {
@@ -77,6 +74,8 @@ function drawElements(ctx) {
         const screenPts = nodes.map(n => viewport.toScreen(n));
         const isSelected = selection.elementIds.has(element.id);
         const isHovered = !isSelected && hover.elementId === element.id;
+        const state = isSelected ? EntityState.SELECTED : isHovered ? EntityState.HOVER : EntityState.DEFAULT;
+        const style = elementStyle(state);
 
         ctx.beginPath();
         ctx.moveTo(screenPts[0].x, screenPts[0].y);
@@ -84,11 +83,11 @@ function drawElements(ctx) {
         if (screenPts.length > 2) ctx.closePath();
 
         if (screenPts.length > 2) {
-            ctx.fillStyle = isSelected ? cssVar("--element-selected-fill") : cssVar("--element-fill");
+            ctx.fillStyle = style.fill;
             ctx.fill();
         }
-        ctx.strokeStyle = isSelected ? cssVar("--node-selected") : isHovered ? cssVar("--hover-highlight") : cssVar("--element-stroke");
-        ctx.lineWidth = isSelected ? 3 : isHovered ? 2 : 1;
+        ctx.strokeStyle = style.stroke;
+        ctx.lineWidth = style.width;
         ctx.stroke();
 
         if (viewport.showElementLabels && viewport.scale >= LABEL_SCALE_THRESHOLD) {
@@ -103,15 +102,16 @@ function drawElements(ctx) {
     ctx.restore();
 }
 
-function drawEdge(ctx, edge, strokeStyle, lineWidth, dashed = false) {
+function drawEdge(ctx, edge, style) {
     const a = store.node(edge.a);
     const b = store.node(edge.b);
     if (!a || !b) return;
     const pa = viewport.toScreen(a);
     const pb = viewport.toScreen(b);
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = lineWidth;
-    ctx.setLineDash(dashed ? [7, 6] : []);
+    ctx.globalAlpha = style.alpha;
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = style.width;
+    ctx.setLineDash(style.dashed ? [7, 6] : []);
     ctx.beginPath();
     ctx.moveTo(pa.x, pa.y);
     ctx.lineTo(pb.x, pb.y);
@@ -122,10 +122,10 @@ function drawEdge(ctx, edge, strokeStyle, lineWidth, dashed = false) {
 // Every pickable element face (boundary or internal - "surfaces") is always
 // visible so users always know where they can be picked - not only while
 // the Select Surface tool is active. Hovered and selected edges draw over
-// the plain pass in bolder colors, in that order, so selection always wins
-// visually. A surface set's own hide/isolate only ever affects this pass,
-// never the owning element's rendering in `drawElements` - a hidden/
-// isolated-out edge still draws, but dim and dashed ("ghosted") rather than
+// the default pass in bolder styles, in that order, so selection always
+// wins visually. A surface set's own hide/isolate only ever affects this
+// pass, never the owning element's rendering in `drawElements` - a hidden/
+// isolated-out edge still draws, in `EntityState.GHOST` style, rather than
 // vanishing, since the element's own border would otherwise retrace the
 // exact same line and make the hide toggle look like it did nothing.
 function drawEdgeFaces(ctx) {
@@ -133,28 +133,19 @@ function drawEdgeFaces(ctx) {
     for (const edge of store.edgeFaces) {
         if (!store.isElementVisible(edge.elementId)) continue;
         if (selection.faceKeys.has(edge.key) || hover.faceKey === edge.key) continue;
-        if (store.isEdgeGhosted(edge)) {
-            // Thick and dashed, at near-full opacity, so it's clearly
-            // visible on top of the element's own (thin, solid) border -
-            // a thin faint overlay would be indistinguishable from it.
-            ctx.globalAlpha = 0.9;
-            drawEdge(ctx, edge, cssVar("--text-muted"), 4, true);
-        } else {
-            ctx.globalAlpha = 0.55;
-            drawEdge(ctx, edge, cssVar("--element-stroke"), 2);
-        }
+        const state = store.isEdgeGhosted(edge) ? EntityState.GHOST : EntityState.DEFAULT;
+        drawEdge(ctx, edge, edgeFaceStyle(state));
     }
-    ctx.globalAlpha = 1;
     // Gate on the element alone (not the stricter isEdgeVisible) so a
     // selected edge keeps showing even if its surface set gets hidden
     // afterwards - selection should never just silently vanish.
     if (hover.faceKey && !selection.faceKeys.has(hover.faceKey)) {
         const edge = store.edgeFaceMap.get(hover.faceKey);
-        if (edge && store.isElementVisible(edge.elementId)) drawEdge(ctx, edge, cssVar("--hover-highlight"), 2.5);
+        if (edge && store.isElementVisible(edge.elementId)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.HOVER));
     }
     for (const key of selection.faceKeys) {
         const edge = store.edgeFaceMap.get(key);
-        if (edge && store.isElementVisible(edge.elementId)) drawEdge(ctx, edge, cssVar("--node-selected"), 3.5);
+        if (edge && store.isElementVisible(edge.elementId)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.SELECTED));
     }
     ctx.restore();
 }
@@ -167,10 +158,12 @@ function drawNodes(ctx) {
         const p = viewport.toScreen(node);
         const isSelected = selection.nodeIds.has(node.id);
         const isHovered = !isSelected && hover.nodeId === node.id;
+        const state = isSelected ? EntityState.SELECTED : isHovered ? EntityState.HOVER : EntityState.DEFAULT;
+        const style = nodeStyle(state);
 
         ctx.beginPath();
-        ctx.arc(p.x, p.y, isSelected ? radius + 1.5 : isHovered ? radius + 1 : radius, 0, Math.PI * 2);
-        ctx.fillStyle = isSelected ? cssVar("--node-selected") : isHovered ? cssVar("--hover-highlight") : cssVar("--node-color");
+        ctx.arc(p.x, p.y, radius + style.radiusDelta, 0, Math.PI * 2);
+        ctx.fillStyle = style.color;
         ctx.fill();
 
         if (viewport.showNodeLabels && viewport.scale >= LABEL_SCALE_THRESHOLD) {
