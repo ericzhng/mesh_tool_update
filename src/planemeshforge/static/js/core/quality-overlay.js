@@ -68,10 +68,11 @@ class QualityOverlay {
         return this.levels.get(elementId) || QualityLevel.OK;
     }
 
+    // With no `level`, returns every non-"ok" (warn + bad) element id.
     flaggedIds(level = null) {
         const ids = [];
         for (const [id, lvl] of this.levels) {
-            if (!level || lvl === level) ids.push(id);
+            if (level ? lvl === level : lvl !== QualityLevel.OK) ids.push(id);
         }
         return ids;
     }
