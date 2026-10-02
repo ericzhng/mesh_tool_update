@@ -52,6 +52,13 @@ html, body {
     z-index: 5;
 }
 
+#scale-bar {
+    position: absolute;
+    bottom: var(--space-3);
+    right: var(--space-3);
+    z-index: 5;
+}
+
 #tool-hint {
     position: absolute;
     top: var(--space-3);

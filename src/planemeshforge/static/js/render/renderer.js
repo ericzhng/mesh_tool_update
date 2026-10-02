@@ -27,10 +27,7 @@ export function scheduleDraw() {
 }
 
 function drawGrid(ctx) {
-    const spacing = viewport.gridSpacing || 1;
-    let pixelSpacing = spacing * viewport.scale;
-    while (pixelSpacing < 20) pixelSpacing *= 2;
-    while (pixelSpacing > 160) pixelSpacing /= 2;
+    const { pixels: pixelSpacing } = viewport.gridStep();
 
     ctx.save();
     ctx.strokeStyle = cssVar("--grid-line");

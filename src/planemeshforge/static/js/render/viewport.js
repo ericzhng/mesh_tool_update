@@ -132,6 +132,27 @@ class Viewport {
         bus.emit("viewport:changed", this);
     }
 
+    // The grid line spacing actually drawn (renderer.js's drawGrid): starts
+    // from `gridSpacing` and doubles/halves it in world space - never an
+    // arbitrary "nice number" rescale - until the on-screen gap lands in a
+    // readable 20-160px band. Exposed here (rather than kept private to the
+    // grid-drawing code) so the scale bar reads the exact same step instead
+    // of running its own separate rounding scheme that could disagree with
+    // what's actually on screen.
+    gridStep() {
+        let world = this.gridSpacing || 1;
+        let pixels = world * this.scale;
+        while (pixels < 20) {
+            world *= 2;
+            pixels *= 2;
+        }
+        while (pixels > 160) {
+            world /= 2;
+            pixels /= 2;
+        }
+        return { world, pixels };
+    }
+
     snap(value) {
         if (!this.snapToGrid) return value;
         return Math.round(value / this.gridSpacing) * this.gridSpacing;

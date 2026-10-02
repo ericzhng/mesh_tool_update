@@ -524,6 +524,50 @@ button {
     box-shadow: var(--shadow-sm);
 }
 
+/* ---------- Scale bar ---------- */
+/* A CAD-style ruler segment ("|---|") plus its real-world length, matching
+   the grid lines drawn behind it (ui/scale-bar.js reads viewport.gridStep(),
+   the same step render/renderer.js's drawGrid uses). */
+#scale-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+    padding: 6px var(--space-2) 5px;
+    pointer-events: none;
+    user-select: none;
+}
+.scale-bar-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+.scale-bar-track {
+    height: 9px;
+    min-width: 20px;
+    border-left: 1.5px solid var(--text-secondary);
+    border-right: 1.5px solid var(--text-secondary);
+    border-bottom: 1.5px solid var(--text-secondary);
+    transition: width var(--transition-fast);
+}
+.scale-bar-value {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.scale-bar-caption {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
 /* ---------- Hover quality tooltip ---------- */
 #quality-tooltip {
     background: var(--bg-surface);

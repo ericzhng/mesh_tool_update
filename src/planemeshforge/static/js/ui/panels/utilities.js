@@ -1,5 +1,6 @@
 // The Utilities dock tab: snap settings, transforms, mesh cleanup tools,
 // and the quality checker.
+import { bus } from "../../core/events.js";
 import { store } from "../../core/store.js";
 import { selection } from "../../core/selection.js";
 import { qualityOverlay, QualityLevel } from "../../core/quality-overlay.js";
@@ -44,7 +45,15 @@ export function buildUtilitiesPanel(root) {
     gridCheckbox.checked = viewport.snapToGrid;
     nodeCheckbox.checked = viewport.snapToNode;
     gridCheckbox.addEventListener("change", () => (viewport.snapToGrid = gridCheckbox.checked));
-    spacingInput.addEventListener("change", () => (viewport.gridSpacing = parseFloat(spacingInput.value) || 1));
+    spacingInput.addEventListener("change", () => {
+        viewport.gridSpacing = parseFloat(spacingInput.value) || 1;
+        // gridSpacing isn't part of pan/zoom, so nothing else schedules a
+        // redraw or tells the scale bar/status bar to refresh - without
+        // this the grid lines and scale bar would silently show the old
+        // spacing until the next pan/zoom.
+        bus.emit("viewport:changed", viewport);
+        scheduleDraw();
+    });
     nodeCheckbox.addEventListener("change", () => (viewport.snapToNode = nodeCheckbox.checked));
 
     // ---- Transform ----

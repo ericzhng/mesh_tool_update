@@ -6,6 +6,7 @@ import { store } from "../../core/store.js";
 import { selection } from "../../core/selection.js";
 import { boundingBox, signedArea } from "../../core/geometry.js";
 import { qualityOverlay } from "../../core/quality-overlay.js";
+import { viewport } from "../../render/viewport.js";
 import * as client from "../../net/client.js";
 import { toast } from "../toast.js";
 import { icon } from "../icons.js";
@@ -143,6 +144,23 @@ function renderMultiSelection(root) {
     root.appendChild(info);
 }
 
+// With nothing selected, show the model-space size of the current view
+// instead of just the empty-selection hint - the canvas's own pixel size
+// isn't very useful since it's just the window, but width/scale and
+// height/scale is how big a model-space rectangle is actually visible.
+function renderNothingSelected(root) {
+    root.innerHTML = `<div class="empty-hint">Nothing selected. Click a node or element on the canvas.</div>`;
+
+    const view = section("View");
+    const widthWorld = viewport.width / viewport.scale;
+    const heightWorld = viewport.height / viewport.scale;
+    view.innerHTML += `
+        <div class="field-row"><label>Width</label><input type="text" value="${widthWorld.toFixed(1)}" disabled></div>
+        <div class="field-row"><label>Height</label><input type="text" value="${heightWorld.toFixed(1)}" disabled></div>
+    `;
+    root.appendChild(view);
+}
+
 export function buildInspectorPanel(root) {
     function render() {
         root.innerHTML = "";
@@ -150,7 +168,7 @@ export function buildInspectorPanel(root) {
         const elementCount = selection.elementIds.size;
 
         if (nodeCount === 0 && elementCount === 0) {
-            root.innerHTML = `<div class="empty-hint">Nothing selected. Click a node or element on the canvas.</div>`;
+            renderNothingSelected(root);
             return;
         }
         if (nodeCount === 1 && elementCount === 0) {
@@ -167,5 +185,9 @@ export function buildInspectorPanel(root) {
     bus.on("selection:changed", render);
     bus.on("mesh:changed", render);
     bus.on("quality:changed", render);
+    // Only matters while nothing's selected (renderNothingSelected is the
+    // only state that reads viewport size/scale), but pan/zoom/resize fire
+    // this constantly, so re-rendering is cheap by construction either way.
+    bus.on("viewport:changed", render);
     render();
 }

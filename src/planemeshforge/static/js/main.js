@@ -18,6 +18,7 @@ import { buildMenubar } from "./ui/menubar.js";
 import { buildToolRail, buildViewportControls } from "./ui/toolbar.js";
 import { buildDock } from "./ui/dock.js";
 import { buildStatusBar } from "./ui/statusbar.js";
+import { buildScaleBar } from "./ui/scale-bar.js";
 import { installQualityTooltip } from "./ui/quality-tooltip.js";
 import { installContextMenu } from "./ui/context-menu.js";
 import { installShortcuts } from "./ui/shortcuts.js";
@@ -84,6 +85,7 @@ async function main() {
     buildMenubar(document.getElementById("menubar-menus"));
     buildToolRail(document.getElementById("tool-rail"));
     buildViewportControls(document.getElementById("viewport-controls"));
+    buildScaleBar(document.getElementById("scale-bar"));
     buildDock(document.getElementById("dock"));
     buildStatusBar(document.getElementById("status-bar"), canvas, document.getElementById("tool-hint"));
     installQualityTooltip(canvas, document.getElementById("quality-tooltip"));
