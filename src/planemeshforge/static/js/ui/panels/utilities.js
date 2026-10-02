@@ -173,22 +173,16 @@ export function buildUtilitiesPanel(root) {
     });
 
     // ---- Quality ----
+    // No "Fix Element Winding" button here: MeshEditor.apply() now runs
+    // topo.orient_ccw() after every op (and MeshEditor.set_mesh() on every
+    // load/import), so winding is corrected automatically and a manual fix
+    // would always find nothing to do. The fix_orientation op itself still
+    // exists server-side (tests/test_ops.py exercises it directly).
     const quality = section("Mesh Quality");
     quality.innerHTML += `<div class="btn-row">
             <button class="btn" id="tool-check">${icon("check-list")}Run Quality Check</button>
-            <button class="btn" id="tool-fix-winding">${icon("rotate-ccw")}Fix Element Winding</button>
         </div><div id="quality-results"></div>`;
     root.appendChild(quality);
-
-    quality.querySelector("#tool-fix-winding").addEventListener("click", async () => {
-        const result = await client.op("fix_orientation", {});
-        if (!result.ok) {
-            toast.error(result.error);
-            return;
-        }
-        const n = (result.reversed_ids || []).length;
-        toast[n ? "success" : "info"](n ? `Fixed node winding on ${n} element(s).` : "No inverted elements found.");
-    });
 
     quality.querySelector("#tool-check").addEventListener("click", async () => {
         const result = await client.qualityCheck();
