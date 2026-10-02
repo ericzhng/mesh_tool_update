@@ -23,6 +23,7 @@ class ToolManager {
         this.active?.onDeactivate?.();
         this.active = this.tools.get(id) || null;
         this.active?.onActivate?.();
+        viewport.showAllNodes = !!this.active?.showsAllNodes;
         if (this.canvas) this.canvas.style.cursor = this.active?.cursor || "default";
         setToolOverlay(ctx => this.active?.drawOverlay?.(ctx));
         bus.emit("tool:changed", this.active);

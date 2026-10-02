@@ -15,6 +15,10 @@ class Viewport {
         this.snapToNode = false;
         this.showNodeLabels = false;
         this.showElementLabels = false;
+        // Set by tool-manager when the active tool needs every node visible
+        // for picking (e.g. element-creation tools), overriding the normal
+        // Abaqus-style "nodes hidden until hovered" behavior.
+        this.showAllNodes = false;
     }
 
     attach(canvas) {

@@ -54,13 +54,13 @@
     --success: #1b8a5a;
     --warning: #b8860b;
 
-    --node-color: #1f6feb;
-    --node-selected: #ff8a00;
-    --element-fill: rgba(31, 111, 235, 0.08);
-    --element-stroke: #4d5a6b;
-    --element-selected-fill: rgba(255, 138, 0, 0.22);
-    --element-hover-fill: rgba(255, 194, 102, 0.2);
-    --hover-highlight: #ffc266;
+    --node-color: #1f2a1f;
+    --node-selected: #e8201b;
+    --element-fill: #8fd48f;
+    --element-stroke: #1f2a1f;
+    --element-selected-fill: #f0645a;
+    --element-hover-fill: #8fd48f;
+    --hover-highlight: #ff8c00;
     --quality-warn-fill: rgba(184, 134, 11, 0.18);
     --quality-warn-stroke: #b8860b;
     --quality-bad-fill: rgba(209, 55, 63, 0.2);
@@ -96,13 +96,13 @@
     --success: #34b57c;
     --warning: #d9a52a;
 
-    --node-color: #4c8dff;
-    --node-selected: #ffab3d;
-    --element-fill: rgba(76, 141, 255, 0.12);
-    --element-stroke: #aeb9c9;
-    --element-selected-fill: rgba(255, 171, 61, 0.26);
-    --element-hover-fill: rgba(255, 214, 153, 0.22);
-    --hover-highlight: #ffd699;
+    --node-color: #e7ebf0;
+    --node-selected: #ff3b30;
+    --element-fill: #5fae5f;
+    --element-stroke: #0d140d;
+    --element-selected-fill: #d9483f;
+    --element-hover-fill: #5fae5f;
+    --hover-highlight: #ffa024;
     --quality-warn-fill: rgba(217, 165, 42, 0.22);
     --quality-warn-stroke: #d9a52a;
     --quality-bad-fill: rgba(239, 90, 98, 0.24);

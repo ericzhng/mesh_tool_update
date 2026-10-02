@@ -6,6 +6,7 @@ import { viewport } from "../render/viewport.js";
 import * as client from "../net/client.js";
 import { toast } from "../ui/toast.js";
 import { hitNode } from "../core/hit-test.js";
+import { hover } from "../core/hover.js";
 
 function makeCreateElementTool(id, label, elementType, nodeCount) {
     return {
@@ -15,6 +16,9 @@ function makeCreateElementTool(id, label, elementType, nodeCount) {
         nodeCount,
         cursor: "crosshair",
         hint: `Click ${nodeCount} nodes to create a ${label.toLowerCase()} · Esc to cancel`,
+        // Every node is a potential pick target, so nodes stay visible for
+        // the whole lifetime of this tool rather than only on hover.
+        showsAllNodes: true,
         _picked: [],
         _hoverWorld: null,
 
@@ -23,6 +27,7 @@ function makeCreateElementTool(id, label, elementType, nodeCount) {
         },
         onDeactivate() {
             this._picked = [];
+            hover.clear();
         },
 
         async onPointerDown(e, world) {
@@ -43,6 +48,9 @@ function makeCreateElementTool(id, label, elementType, nodeCount) {
 
         onPointerMove(e, world) {
             this._hoverWorld = world;
+            const node = hitNode(world);
+            if (node) hover.setNode(node.id);
+            else hover.clear();
         },
 
         onKeyDown(e) {

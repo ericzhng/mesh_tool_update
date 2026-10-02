@@ -1,10 +1,11 @@
 // Centralized visual styling for canvas entities (nodes, elements, surface
-// edges) across their interaction states - modeled on conventions common to
-// CAD/FEA tools (Abaqus/CAE, SolidWorks, AutoCAD):
-//   - default: the entity's normal "model" appearance.
-//   - hover:   a light preview highlight shown before a click commits a
-//              pick, so the user sees what they're about to select.
-//   - selected: a bold, saturated highlight - the "picked" state.
+// edges) across their interaction states - modeled on Abaqus/CAE conventions:
+//   - default: solid green elements with thin dark borders; nodes are not
+//              drawn at all unless hovered/selected (see drawNodes in
+//              renderer.js) - Abaqus only reveals nodes on demand.
+//   - hover:   the element/edge/node under the cursor outlines in bright
+//              orange, so the user sees what they're about to pick.
+//   - selected: a bold red highlight - the "picked" state.
 //   - ghost:   dashed and muted - the classic technical-drawing convention
 //              for a hidden line whose parent geometry is still shown (used
 //              when a surface edge's own set is hidden/isolated-out but
@@ -44,9 +45,9 @@ export function nodeStyle(state) {
 export function elementStyle(state) {
     switch (state) {
         case EntityState.SELECTED:
-            return { fill: cssVar("--element-selected-fill"), stroke: cssVar("--node-selected"), width: 3 };
+            return { fill: cssVar("--element-selected-fill"), stroke: cssVar("--node-selected"), width: 2.5 };
         case EntityState.HOVER:
-            return { fill: cssVar("--element-hover-fill"), stroke: cssVar("--hover-highlight"), width: 2 };
+            return { fill: cssVar("--element-hover-fill"), stroke: cssVar("--hover-highlight"), width: 2.5 };
         case EntityState.QUALITY_BAD:
             return { fill: cssVar("--quality-bad-fill"), stroke: cssVar("--quality-bad-stroke"), width: 2 };
         case EntityState.QUALITY_WARN:
@@ -68,6 +69,9 @@ export function edgeFaceStyle(state) {
             // faint overlay would be indistinguishable from it.
             return { stroke: cssVar("--text-muted"), width: 4, dashed: true, alpha: 0.9 };
         default:
-            return { stroke: cssVar("--element-stroke"), width: 2, dashed: false, alpha: 0.55 };
+            // Not drawn - the element's own border (drawElements) already
+            // traces this exact line; redrawing it here would double its
+            // apparent width and defeat the thin-dark-edge look.
+            return { stroke: cssVar("--element-stroke"), width: 1, dashed: false, alpha: 0 };
     }
 }
