@@ -52,6 +52,11 @@ def register_sockets(socketio: SocketIO, editor: MeshEditor, storage: SessionSto
         """Read-only: returns mesh quality issues without mutating anything."""
         return {"ok": True, "issues": editor.quality_check()}
 
+    @socketio.on("quality_metrics")
+    def handle_quality_metrics(_data=None):
+        """Read-only: returns per-element shape-quality metrics."""
+        return {"ok": True, **editor.quality_metrics()}
+
     @socketio.on("load_mesh")
     def handle_load_mesh(data):
         """Replaces the whole mesh (project open) without touching undo history."""

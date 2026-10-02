@@ -199,5 +199,8 @@ def split_quads(mesh: Mesh, element_ids: list[int]) -> list[int]:
         tri_block = ElementBlock("CGAX3", np.array(new_ids), np.array(new_conn))
         mesh.cells = merge_element_blocks(mesh.cells + [tri_block])
 
+    for name in list(mesh.elem_sets):
+        mesh.elem_sets[name] = [i for i in mesh.elem_sets[name] if i not in target_ids]
+
     mesh._validate_data()
     return new_ids

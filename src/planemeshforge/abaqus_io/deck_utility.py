@@ -1,3 +1,4 @@
+import itertools
 import re
 
 import numpy as np
@@ -145,7 +146,7 @@ def _read_nodes(f, options_map: dict):
     return coord_array, nodes_ids, node_sets, line
 
 
-def _read_cells(f, options_map: dict, point_ids: list[list]):
+def _read_cells(f, options_map: dict, point_ids: list[list], validate_node_ids: bool = True):
     """
     Reads cell (element) information from a file object.
 
@@ -162,6 +163,11 @@ def _read_cells(f, options_map: dict, point_ids: list[list]):
     nodes_id_map : dict
         A dictionary mapping original node IDs to their 0-based index
         in the global `nodes` array.
+    validate_node_ids : bool
+        Whether to check each element's node IDs against `point_ids`. Pass
+        `False` when reading an `*INCLUDE`d deck in isolation, since it may
+        legitimately reference nodes defined in the parent file - that case
+        is instead caught once the merged mesh is validated as a whole.
 
     Returns
     -------
@@ -182,6 +188,8 @@ def _read_cells(f, options_map: dict, point_ids: list[list]):
         num_nodes_per_cell = cell_type_config["nodes"]
     except KeyError:
         raise ValueError(f"Element type not available or misconfigured: {cell_type}")
+
+    known_node_ids = set(itertools.chain.from_iterable(point_ids))
 
     cell_nodes = []
     cell_ids = []
@@ -209,6 +217,14 @@ def _read_cells(f, options_map: dict, point_ids: list[list]):
                 f"Element {elem_id} of type {cell_type} expects {num_nodes_per_cell} nodes, "
                 f"but got {len(node_ids)}: {node_ids}"
             )
+
+        if validate_node_ids:
+            undefined_node_ids = [n for n in node_ids if n not in known_node_ids]
+            if undefined_node_ids:
+                raise ValueError(
+                    f"Element {elem_id} references undefined node IDs: "
+                    f"{', '.join(str(n) for n in undefined_node_ids)}"
+                )
 
         cell_ids.append(elem_id)
         cell_nodes.append(node_ids)

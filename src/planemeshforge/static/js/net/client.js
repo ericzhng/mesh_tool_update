@@ -43,3 +43,7 @@ export function loadMesh(meshDict) {
 export function qualityCheck() {
     return ack("quality_check");
 }
+
+export function qualityMetrics() {
+    return ack("quality_metrics");
+}

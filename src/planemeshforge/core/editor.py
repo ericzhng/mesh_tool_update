@@ -96,6 +96,9 @@ class MeshEditor:
     def quality_check(self) -> list[dict]:
         return quality.check(self.mesh)
 
+    def quality_metrics(self) -> dict:
+        return quality.metrics(self.mesh)
+
     def state(self) -> dict:
         """The full payload broadcast to clients after every change."""
         return {

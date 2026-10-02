@@ -35,6 +35,7 @@ const PATHS = {
     "sun": '<circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5 13 13M13 3l-1.5 1.5M4.5 11.5 3 13"/>',
     "moon": '<path d="M13 8.5A5.5 5.5 0 1 1 7.5 3 4.5 4.5 0 0 0 13 8.5z"/>',
     "close": '<path d="M4 4l8 8"/><path d="M12 4l-8 8"/>',
+    "metrics": '<path d="M2 14V9"/><path d="M6.5 14V4"/><path d="M11 14V7"/><path d="M14 2L9 7 6.5 4.5 2 9"/>',
 };
 
 export function icon(name, extraClass = "") {

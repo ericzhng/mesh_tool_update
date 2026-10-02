@@ -18,6 +18,7 @@ import { buildMenubar } from "./ui/menubar.js";
 import { buildToolRail, buildViewportControls } from "./ui/toolbar.js";
 import { buildDock } from "./ui/dock.js";
 import { buildStatusBar } from "./ui/statusbar.js";
+import { installQualityTooltip } from "./ui/quality-tooltip.js";
 import { installContextMenu } from "./ui/context-menu.js";
 import { installShortcuts } from "./ui/shortcuts.js";
 import * as client from "./net/client.js";
@@ -85,6 +86,7 @@ async function main() {
     buildViewportControls(document.getElementById("viewport-controls"));
     buildDock(document.getElementById("dock"));
     buildStatusBar(document.getElementById("status-bar"), canvas, document.getElementById("tool-hint"));
+    installQualityTooltip(canvas, document.getElementById("quality-tooltip"));
     installContextMenu(canvas);
     installShortcuts();
     wireFileInputs();
@@ -94,6 +96,7 @@ async function main() {
     bus.on("mesh:changed", scheduleDraw);
     bus.on("selection:changed", scheduleDraw);
     bus.on("visibility:changed", scheduleDraw);
+    bus.on("quality:changed", scheduleDraw);
 
     bus.on("connection:changed", ({ connected }) => {
         if (!connected) toast.error("Disconnected from server. Reconnecting…");

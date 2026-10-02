@@ -20,6 +20,10 @@ export const EntityState = Object.freeze({
     HOVER: "hover",
     SELECTED: "selected",
     GHOST: "ghost",
+    // Shape-quality overlay (Utilities > Mesh Quality > Highlight in view):
+    // flags elements whose skewness/aspect-ratio crosses the warn/bad limit.
+    QUALITY_WARN: "quality-warn",
+    QUALITY_BAD: "quality-bad",
 });
 
 export function cssVar(name) {
@@ -43,6 +47,10 @@ export function elementStyle(state) {
             return { fill: cssVar("--element-selected-fill"), stroke: cssVar("--node-selected"), width: 3 };
         case EntityState.HOVER:
             return { fill: cssVar("--element-hover-fill"), stroke: cssVar("--hover-highlight"), width: 2 };
+        case EntityState.QUALITY_BAD:
+            return { fill: cssVar("--quality-bad-fill"), stroke: cssVar("--quality-bad-stroke"), width: 2 };
+        case EntityState.QUALITY_WARN:
+            return { fill: cssVar("--quality-warn-fill"), stroke: cssVar("--quality-warn-stroke"), width: 2 };
         default:
             return { fill: cssVar("--element-fill"), stroke: cssVar("--element-stroke"), width: 1 };
     }

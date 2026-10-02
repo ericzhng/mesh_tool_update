@@ -98,8 +98,8 @@ class ElementBlock:
         )
 
     @classmethod
-    def _cat_same_type(cls, blocks: list[ElementBlock]) -> ElementBlock:
-        """Concatenates a list of ElementBlock objects."""
+    def cat(cls, blocks: list[ElementBlock]) -> ElementBlock:
+        """Concatenates a list of same-type ElementBlock objects into one."""
         if not blocks:
             return cls.empty()
 
@@ -128,6 +128,6 @@ class ElementBlock:
         unique_blocks = []
         for element_type, indices in common_dict.items():
             sub_blocks = [blocks[i] for i in indices]
-            unique_blocks.append(cls._cat_same_type(sub_blocks))
+            unique_blocks.append(cls.cat(sub_blocks))
 
         return unique_blocks

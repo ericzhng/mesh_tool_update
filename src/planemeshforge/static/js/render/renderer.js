@@ -5,6 +5,7 @@
 import { store } from "../core/store.js";
 import { selection } from "../core/selection.js";
 import { hover } from "../core/hover.js";
+import { qualityOverlay, QualityLevel } from "../core/quality-overlay.js";
 import { viewport } from "./viewport.js";
 import { EntityState, cssVar, nodeStyle, elementStyle, edgeFaceStyle } from "./entity-styles.js";
 
@@ -74,7 +75,12 @@ function drawElements(ctx) {
         const screenPts = nodes.map(n => viewport.toScreen(n));
         const isSelected = selection.elementIds.has(element.id);
         const isHovered = !isSelected && hover.elementId === element.id;
-        const state = isSelected ? EntityState.SELECTED : isHovered ? EntityState.HOVER : EntityState.DEFAULT;
+        const qualityLevel = qualityOverlay.levelOf(element.id);
+        let state = EntityState.DEFAULT;
+        if (isSelected) state = EntityState.SELECTED;
+        else if (isHovered) state = EntityState.HOVER;
+        else if (qualityLevel === QualityLevel.BAD) state = EntityState.QUALITY_BAD;
+        else if (qualityLevel === QualityLevel.WARN) state = EntityState.QUALITY_WARN;
         const style = elementStyle(state);
 
         ctx.beginPath();

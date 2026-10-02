@@ -65,7 +65,7 @@ def _read_buffer(f, validate_flag: bool = True):
                 raise Exception("Expected *NODE definition before *ELEMENT definition")
 
             options_map = _get_option_map(line, required_keys=["TYPE"])
-            nodes, ids, sets, line = _read_cells(f, options_map, point_ids)
+            nodes, ids, sets, line = _read_cells(f, options_map, point_ids, validate_node_ids=validate_flag)
             if sets:
                 cell_sets_in_element.update(sets)
             cells.append(ElementBlock(options_map["TYPE"], ids, nodes))

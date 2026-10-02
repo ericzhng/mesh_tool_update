@@ -2,12 +2,19 @@
 // and the quality checker.
 import { store } from "../../core/store.js";
 import { selection } from "../../core/selection.js";
+import { qualityOverlay, QualityLevel } from "../../core/quality-overlay.js";
 import { viewport } from "../../render/viewport.js";
 import { scheduleDraw } from "../../render/renderer.js";
 import * as client from "../../net/client.js";
 import { openDialog } from "../dialogs.js";
 import { toast } from "../toast.js";
 import { icon } from "../icons.js";
+
+const MAX_FLAGGED_ROWS = 50;
+
+function fmt(n) {
+    return n == null ? "–" : n.toFixed(3);
+}
 
 function section(title) {
     const el = document.createElement("div");
@@ -207,4 +214,161 @@ export function buildUtilitiesPanel(root) {
             resultsEl.appendChild(row);
         }
     });
+
+    // ---- Quality metrics (skewness / aspect ratio) ----
+    const metrics = section("Mesh Metrics");
+    metrics.innerHTML += `
+        <div class="btn-row metrics-actions">
+            <button class="btn" id="metrics-compute">${icon("metrics")}Compute Metrics</button>
+            <div class="checkbox-row"><input type="checkbox" id="metrics-highlight"><label for="metrics-highlight">Highlight in view</label></div>
+        </div>
+        <div class="field-row metrics-limit-row"><label>Skew warn / bad</label>
+            <input type="number" class="metrics-limit-input" id="m-skew-warn" min="0" max="1" step="0.05" value="${qualityOverlay.limits.skewnessWarn}">
+            <input type="number" class="metrics-limit-input" id="m-skew-bad" min="0" max="1" step="0.05" value="${qualityOverlay.limits.skewnessBad}">
+        </div>
+        <div class="field-row metrics-limit-row"><label>Aspect warn / bad</label>
+            <input type="number" class="metrics-limit-input" id="m-aspect-warn" min="1" step="0.5" value="${qualityOverlay.limits.aspectRatioWarn}">
+            <input type="number" class="metrics-limit-input" id="m-aspect-bad" min="1" step="0.5" value="${qualityOverlay.limits.aspectRatioBad}">
+        </div>
+        <div id="metrics-summary"></div>
+        <div class="btn-row"><button class="btn" id="metrics-select-flagged">Select Flagged</button></div>
+        <div id="metrics-results"></div>
+    `;
+    root.appendChild(metrics);
+
+    const highlightCheckbox = metrics.querySelector("#metrics-highlight");
+    highlightCheckbox.checked = qualityOverlay.enabled;
+
+    function metricVal(selector) {
+        return parseFloat(metrics.querySelector(selector).value);
+    }
+
+    function currentLimits() {
+        return {
+            skewnessWarn: metricVal("#m-skew-warn"),
+            skewnessBad: metricVal("#m-skew-bad"),
+            aspectRatioWarn: metricVal("#m-aspect-warn"),
+            aspectRatioBad: metricVal("#m-aspect-bad"),
+        };
+    }
+
+    // Flags a summary-table cell when the metric's max crosses a limit, so
+    // the worst-case column reads at a glance instead of needing the raw
+    // per-element list below.
+    function cellClass(maxValue, warnLimit, badLimit) {
+        if (maxValue == null) return "metrics-table-cell";
+        if (maxValue >= badLimit) return "metrics-table-cell flagged bad";
+        if (maxValue >= warnLimit) return "metrics-table-cell flagged";
+        return "metrics-table-cell";
+    }
+
+    function renderMetrics() {
+        const summaryEl = metrics.querySelector("#metrics-summary");
+        const resultsEl = metrics.querySelector("#metrics-results");
+        if (!qualityOverlay.elements.length) {
+            summaryEl.innerHTML = `<div class="empty-hint">No metrics computed yet.</div>`;
+            resultsEl.innerHTML = "";
+            return;
+        }
+
+        const counts = { [QualityLevel.OK]: 0, [QualityLevel.WARN]: 0, [QualityLevel.BAD]: 0 };
+        for (const level of qualityOverlay.levels.values()) counts[level]++;
+
+        const limits = qualityOverlay.limits;
+        const skew = qualityOverlay.summary.skewness;
+        const aspect = qualityOverlay.summary.aspect_ratio;
+        summaryEl.innerHTML = `
+            <div class="metrics-table">
+                <span class="metrics-table-head"></span>
+                <span class="metrics-table-head">Min</span>
+                <span class="metrics-table-head">Mean</span>
+                <span class="metrics-table-head">Max</span>
+
+                <span class="metrics-table-label">Skewness</span>
+                <span class="metrics-table-cell">${fmt(skew?.min)}</span>
+                <span class="metrics-table-cell">${fmt(skew?.mean)}</span>
+                <span class="${cellClass(skew?.max, limits.skewnessWarn, limits.skewnessBad)}">${fmt(skew?.max)}</span>
+
+                <span class="metrics-table-label">Aspect ratio</span>
+                <span class="metrics-table-cell">${fmt(aspect?.min)}</span>
+                <span class="metrics-table-cell">${fmt(aspect?.mean)}</span>
+                <span class="${cellClass(aspect?.max, limits.aspectRatioWarn, limits.aspectRatioBad)}">${fmt(aspect?.max)}</span>
+            </div>
+            <div class="metrics-counts">
+                <div class="metrics-badge ok"><strong>${counts.ok}</strong>ok</div>
+                <div class="metrics-badge warn ${counts.warn ? "active" : ""}"><strong>${counts.warn}</strong>warn</div>
+                <div class="metrics-badge bad ${counts.bad ? "active" : ""}"><strong>${counts.bad}</strong>bad</div>
+            </div>
+        `;
+
+        const severity = e => Math.max(e.skewness / limits.skewnessBad, (e.aspect_ratio || 0) / limits.aspectRatioBad);
+        const flagged = qualityOverlay.elements
+            .filter(e => qualityOverlay.levels.get(e.id) !== QualityLevel.OK)
+            .sort((a, b) => severity(b) - severity(a));
+
+        resultsEl.innerHTML = "";
+        if (!flagged.length) {
+            resultsEl.innerHTML = `<div class="empty-hint">No skewed elements found.</div>`;
+            return;
+        }
+        for (const elem of flagged.slice(0, MAX_FLAGGED_ROWS)) {
+            const level = qualityOverlay.levels.get(elem.id);
+            const skewOver = elem.skewness >= limits.skewnessWarn;
+            const aspectOver = elem.aspect_ratio != null && elem.aspect_ratio >= limits.aspectRatioWarn;
+            const row = document.createElement("div");
+            row.className = `issue-row metrics-flagged-row ${level === QualityLevel.BAD ? "error" : "warning"}`;
+            row.innerHTML = `
+                <span class="metrics-flagged-id">#${elem.id} <span class="type">${elem.type}</span></span>
+                <span class="metrics-flagged-values">
+                    <span class="${skewOver ? "over" : ""}">skew ${fmt(elem.skewness)}</span>
+                    <span class="${aspectOver ? "over" : ""}">aspect ${fmt(elem.aspect_ratio)}</span>
+                </span>
+            `;
+            row.addEventListener("click", () => {
+                selection.setElements([elem.id]);
+                scheduleDraw();
+            });
+            resultsEl.appendChild(row);
+        }
+        if (flagged.length > MAX_FLAGGED_ROWS) {
+            const more = document.createElement("div");
+            more.className = "empty-hint";
+            more.textContent = `+${flagged.length - MAX_FLAGGED_ROWS} more`;
+            resultsEl.appendChild(more);
+        }
+    }
+
+    metrics.querySelector("#metrics-compute").addEventListener("click", async () => {
+        qualityOverlay.setLimits(currentLimits());
+        const result = await qualityOverlay.compute();
+        if (!result.ok) {
+            toast.error(result.error);
+            return;
+        }
+        renderMetrics();
+    });
+
+    for (const id of ["#m-skew-warn", "#m-skew-bad", "#m-aspect-warn", "#m-aspect-bad"]) {
+        metrics.querySelector(id).addEventListener("change", () => {
+            qualityOverlay.setLimits(currentLimits());
+            renderMetrics();
+        });
+    }
+
+    highlightCheckbox.addEventListener("change", async () => {
+        await qualityOverlay.setEnabled(highlightCheckbox.checked);
+        renderMetrics();
+    });
+
+    metrics.querySelector("#metrics-select-flagged").addEventListener("click", () => {
+        const flaggedIds = qualityOverlay.flaggedIds();
+        if (!flaggedIds.length) {
+            toast.info("No flagged elements. Run Compute Metrics first.");
+            return;
+        }
+        selection.setElements(flaggedIds);
+        scheduleDraw();
+    });
+
+    renderMetrics();
 }

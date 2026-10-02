@@ -61,6 +61,18 @@ class TestElementOps(unittest.TestCase):
         self.assertEqual(len(mesh.cells), 1)
         self.assertEqual(mesh.cells[0].element_type, "CGAX3")
 
+    def test_split_quads_drops_split_elements_from_elem_sets(self):
+        # Regression test: a quad that belongs to an ELSET (e.g. imported
+        # from an Abaqus deck's `*ELSET`) must be removed from that set when
+        # split, otherwise `Mesh._validate_data` rejects the now-dangling id.
+        points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
+        quad = ElementBlock("CGAX4", [1], [[1, 2, 3, 4]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3, 4], cells=[quad], elem_sets={"quads": [1]})
+        result = ops.split_quads(mesh, [1])
+        self.assertEqual(len(result["created_ids"]), 2)
+        self.assertEqual(mesh.elem_sets["quads"], [])
+        mesh._validate_data()  # must not raise
+
     def test_fix_orientation_reverses_clockwise_elements(self):
         points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
         tri = ElementBlock("CGAX3", [1], [[1, 3, 2]])  # clockwise
