@@ -225,7 +225,10 @@ export function buildUtilitiesPanel(root) {
             <input type="number" class="metrics-limit-input" id="m-aspect-bad" min="1" step="0.5" value="${qualityOverlay.limits.aspectRatioBad}">
         </div>
         <div id="metrics-summary"></div>
-        <div class="btn-row"><button class="btn" id="metrics-select-flagged">Select Flagged</button></div>
+        <div class="btn-row">
+            <button class="btn" id="metrics-select-warn">Select Warn</button>
+            <button class="btn" id="metrics-select-bad">Select Bad</button>
+        </div>
         <div id="metrics-results"></div>
     `;
     root.appendChild(metrics);
@@ -354,14 +357,21 @@ export function buildUtilitiesPanel(root) {
         renderMetrics();
     });
 
-    metrics.querySelector("#metrics-select-flagged").addEventListener("click", () => {
-        const flaggedIds = qualityOverlay.flaggedIds();
-        if (!flaggedIds.length) {
-            toast.info("No flagged elements. Run Compute Metrics first.");
+    function selectByLevel(level, label) {
+        const ids = qualityOverlay.flaggedIds(level);
+        if (!ids.length) {
+            toast.info(`No ${label} elements. Run Compute Metrics first.`);
             return;
         }
-        selection.setElements(flaggedIds);
+        selection.setElements(ids);
         scheduleDraw();
+    }
+
+    metrics.querySelector("#metrics-select-warn").addEventListener("click", () => {
+        selectByLevel(QualityLevel.WARN, "warn");
+    });
+    metrics.querySelector("#metrics-select-bad").addEventListener("click", () => {
+        selectByLevel(QualityLevel.BAD, "bad");
     });
 
     renderMetrics();
