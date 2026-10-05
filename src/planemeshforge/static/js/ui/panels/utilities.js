@@ -129,7 +129,7 @@ export function buildUtilitiesPanel(root) {
     tools.querySelector("#tool-merge").addEventListener("click", async () => {
         const values = await openDialog({
             title: "Merge Coincident Nodes",
-            fields: [{ name: "tolerance", label: "Tolerance", type: "number", default: 1e-6, step: "0.000001" }],
+            fields: [{ name: "tolerance", label: "Tolerance", type: "number", default: 1e-6, step: "0.0001" }],
             submitLabel: "Merge",
         });
         if (!values) return;

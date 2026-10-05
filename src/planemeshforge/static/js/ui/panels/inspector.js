@@ -151,6 +151,15 @@ function renderMultiSelection(root) {
 function renderNothingSelected(root) {
     root.innerHTML = `<div class="empty-hint">Nothing selected. Click a node or element on the canvas.</div>`;
 
+    if (store.mesh.nodes.length) {
+        const mesh = section("Mesh");
+        mesh.innerHTML += `
+            <div class="field-row"><label>Nodes</label><input type="text" value="${store.summary.num_nodes}" disabled></div>
+            <div class="field-row"><label>Elements</label><input type="text" value="${store.summary.num_elements}" disabled></div>
+        `;
+        root.appendChild(mesh);
+    }
+
     const view = section("View");
     const widthWorld = viewport.width / viewport.scale;
     const heightWorld = viewport.height / viewport.scale;
