@@ -1,14 +1,38 @@
 // Registers every command the app exposes. Imported once by main.js.
 import { define } from "./registry.js";
+import { bus } from "../core/events.js";
 import { store } from "../core/store.js";
 import { selection } from "../core/selection.js";
 import { viewport } from "../render/viewport.js";
 import { scheduleDraw } from "../render/renderer.js";
 import { toolManager } from "../tools/tool-manager.js";
+import { selectTool } from "../tools/select.js";
 import * as client from "../net/client.js";
 import * as project from "../project/project.js";
 import { toast } from "../ui/toast.js";
 import { createElementFromNodes } from "../core/element-builder.js";
+
+// Activates the shared select tool with a given entity-type filter ("point"
+// = nodes/elements, "edge" = surfaces). Both filters live on one tool
+// (tools/select.js) so box/lasso/drag mechanics stay identical regardless
+// of which kind a click resolves to - toolManager.activate() short-circuits
+// when the tool's already active, so the redraw/tool:changed emit has to
+// happen here too, not just inside activate(), or flipping filters while
+// already on the select tool wouldn't refresh the hint badge or tool rail.
+function selectFilterCommand(id, filter, label, icon, shortcut) {
+    define({
+        id,
+        label,
+        icon,
+        shortcut,
+        run: () => {
+            toolManager.activate("select");
+            selectTool.setFilter(filter);
+            bus.emit("tool:changed", toolManager.active);
+            scheduleDraw();
+        },
+    });
+}
 
 function toolCommand(id, toolId, label, icon, shortcut) {
     define({ id, label, icon, shortcut, run: () => toolManager.activate(toolId) });
@@ -81,8 +105,8 @@ export function registerCommands() {
     });
 
     // ---- Tools ----
-    toolCommand("tool.select", "select", "Select", "select", "V");
-    toolCommand("tool.selectSurface", "select-surface", "Select Surface", "surface", "S");
+    selectFilterCommand("tool.select", "point", "Select", "select", "V");
+    selectFilterCommand("tool.selectSurface", "edge", "Select Surface", "surface", "S");
     toolCommand("tool.addNode", "add-node", "Add Node", "add-node", "N");
     toolCommand("tool.createLine", "create-line", "Create Line", "line", "L");
     toolCommand("tool.createElement", "create-element", "Create Element", "quad", "E");

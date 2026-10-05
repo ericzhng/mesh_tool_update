@@ -1,38 +1,73 @@
-// The default tool: click to pick a node or element, box/lasso to
-// multi-select, drag to move the current node selection. Dragging updates
-// node positions locally for instant feedback and only tells the server
-// once, on release.
+// The default tool: click to pick a node, element, or edge ("surface");
+// box/lasso to multi-select; drag to move the current node selection.
+// A persistent filter - `V` for nodes/elements, `S` for edges - decides
+// which kind a click or box resolves to, Abaqus/HyperMesh-style: one tool,
+// one set of box/lasso/drag/shift/ctrl mechanics, with the filter just
+// narrowing what counts as a hit. Switching filters doesn't touch the
+// current selection, so you can grab some nodes, flip to the edge filter,
+// and add edges without losing them - selection.js itself still only holds
+// one kind at a time, so adding an edge after nodes replaces them, same as
+// clicking a node after edges would.
 import { store } from "../core/store.js";
 import { selection } from "../core/selection.js";
 import { hover } from "../core/hover.js";
 import { viewport } from "../render/viewport.js";
 import * as client from "../net/client.js";
 import { pointInPolygon } from "../core/geometry.js";
-import { hitNode, hitElement, pickRadiusWorld } from "../core/hit-test.js";
+import { hitNode, hitElement, hitEdge, pickRadiusWorld } from "../core/hit-test.js";
 
 export const selectTool = {
     id: "select",
-    label: "Select",
     cursor: "default",
-    hint: "Click to select · drag to move · box/Alt+drag to lasso · Shift adds · Ctrl toggles",
+    // "point" = nodes/elements (the historical default-tool behavior),
+    // "edge" = surfaces (the historical select-surface-tool behavior).
+    filter: "point",
 
     _drag: null, // { nodeIds, starts: Map(id -> {x,y}), pointerStart }
     _box: null, // { start, current, lasso: bool, points: [] }
 
-    onDeactivate() {
+    get label() {
+        return this.filter === "edge" ? "Select Surface" : "Select";
+    },
+
+    get hint() {
+        return this.filter === "edge"
+            ? "Click an edge to select · box/Alt+drag to lasso · Shift adds · Ctrl toggles"
+            : "Click to select · drag to move · box/Alt+drag to lasso · Shift adds · Ctrl toggles";
+    },
+
+    setFilter(filter) {
+        if (this.filter === filter) return;
+        this.filter = filter;
+        this._drag = null;
+        this._box = null;
         hover.clear();
     },
 
+    onDeactivate() {
+        hover.clear();
+        this._drag = null;
+        this._box = null;
+    },
+
     onPointerDown(e, world) {
-        const node = hitNode(world);
-        if (node) {
-            this._handleNodeHit(e, node, world);
-            return;
-        }
-        const element = hitElement(world);
-        if (element) {
-            this._handleElementHit(e, element);
-            return;
+        if (this.filter === "edge") {
+            const edge = hitEdge(world);
+            if (edge) {
+                this._handleEdgeHit(e, edge);
+                return;
+            }
+        } else {
+            const node = hitNode(world);
+            if (node) {
+                this._handleNodeHit(e, node, world);
+                return;
+            }
+            const element = hitElement(world);
+            if (element) {
+                this._handleElementHit(e, element);
+                return;
+            }
         }
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) selection.clear();
         this._box = { start: world, current: world, lasso: e.altKey, points: [world] };
@@ -63,15 +98,27 @@ export const selectTool = {
         else selection.setElements([element.id]);
     },
 
+    _handleEdgeHit(e, edge) {
+        if (e.ctrlKey || e.metaKey) selection.toggleFace(edge.key);
+        else if (e.shiftKey) selection.setFaces([...selection.faceKeys, edge.key]);
+        else selection.setFaces([edge.key]);
+    },
+
     onPointerMove(e, world) {
         if (!this._drag && !this._box) {
-            const node = hitNode(world);
-            if (node) {
-                hover.setNode(node.id);
-            } else {
-                const element = hitElement(world);
-                if (element) hover.setElement(element.id);
+            if (this.filter === "edge") {
+                const edge = hitEdge(world);
+                if (edge) hover.setFace(edge.key);
                 else hover.clear();
+            } else {
+                const node = hitNode(world);
+                if (node) {
+                    hover.setNode(node.id);
+                } else {
+                    const element = hitElement(world);
+                    if (element) hover.setElement(element.id);
+                    else hover.clear();
+                }
             }
         }
         if (this._drag) {
@@ -111,12 +158,13 @@ export const selectTool = {
             return;
         }
         if (this._box) {
-            this._finishBoxSelect(e);
+            if (this.filter === "edge") this._finishBoxSelectEdges(e);
+            else this._finishBoxSelectNodes(e);
             this._box = null;
         }
     },
 
-    _finishBoxSelect(e) {
+    _finishBoxSelectNodes(e) {
         const box = this._box;
         const moved = Math.hypot(box.current.x - box.start.x, box.current.y - box.start.y) > pickRadiusWorld() * 0.5;
         if (!moved) return;
@@ -147,6 +195,32 @@ export const selectTool = {
         }
     },
 
+    _finishBoxSelectEdges(e) {
+        const box = this._box;
+        const moved = Math.hypot(box.current.x - box.start.x, box.current.y - box.start.y) > pickRadiusWorld() * 0.5;
+        if (!moved) return;
+
+        const within = point => (box.lasso ? pointInPolygon(point, box.points) : inBox(point, box));
+        const hits = store.edgeFaces.filter(edge => {
+            if (!store.isEdgeVisible(edge)) return false;
+            const a = store.node(edge.a);
+            const b = store.node(edge.b);
+            return a && b && within(a) && within(b);
+        });
+        const keys = hits.map(edge => edge.key);
+
+        if (e.ctrlKey || e.metaKey) {
+            const toRemove = keys.filter(key => selection.faceKeys.has(key));
+            const toAdd = keys.filter(key => !selection.faceKeys.has(key));
+            selection.removeFaces(toRemove);
+            selection.addFaces(toAdd);
+        } else if (e.shiftKey) {
+            selection.addFaces(keys);
+        } else {
+            selection.setFaces(keys);
+        }
+    },
+
     onKeyDown(e) {
         if (e.key === "Escape") {
             this._drag = null;
@@ -158,7 +232,7 @@ export const selectTool = {
     drawOverlay(ctx) {
         if (!this._box) return;
         ctx.save();
-        ctx.strokeStyle = "var(--accent)".includes("var") ? getComputedStyle(document.documentElement).getPropertyValue("--accent") : "#1f6feb";
+        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent") || "#1f6feb";
         ctx.fillStyle = ctx.strokeStyle;
         ctx.globalAlpha = 0.12;
         ctx.lineWidth = 1;
@@ -183,3 +257,11 @@ export const selectTool = {
         ctx.restore();
     },
 };
+
+function inBox(point, box) {
+    const minX = Math.min(box.start.x, box.current.x);
+    const maxX = Math.max(box.start.x, box.current.x);
+    const minY = Math.min(box.start.y, box.current.y);
+    const maxY = Math.max(box.start.y, box.current.y);
+    return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY;
+}
