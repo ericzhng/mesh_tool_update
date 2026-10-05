@@ -189,6 +189,9 @@ function drawEdgeFaces(ctx) {
 // highlights the element itself, not its corner nodes.
 function isNodeRevealed(nodeId, isolatedNodeIds) {
     if (viewport.showAllNodes) return true;
+    // "Show Node Labels" is also the user's way of asking to see every node
+    // - toggling it on reveals the whole mesh's nodes, not just the labels.
+    if (viewport.showNodeLabels) return true;
     if (selection.nodeIds.has(nodeId) || hover.nodeId === nodeId) return true;
     if (isolatedNodeIds?.has(nodeId)) return true;
     if (!store.elementsByNode.has(nodeId)) return true;
@@ -207,13 +210,16 @@ function drawNodes(ctx) {
         const isSelected = selection.nodeIds.has(node.id);
         const isHovered = !isSelected && hover.nodeId === node.id;
         const isIsolated = !isSelected && !isHovered && isolatedNodeIds?.has(node.id);
+        const isLabeled = !isSelected && !isHovered && !isIsolated && viewport.showNodeLabels;
         const state = isSelected
             ? EntityState.SELECTED
             : isHovered
               ? EntityState.HOVER
               : isIsolated
                 ? EntityState.ISOLATED
-                : EntityState.DEFAULT;
+                : isLabeled
+                  ? EntityState.LABELED
+                  : EntityState.DEFAULT;
         const style = nodeStyle(state);
 
         ctx.beginPath();

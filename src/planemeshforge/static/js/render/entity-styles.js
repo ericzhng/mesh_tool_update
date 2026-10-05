@@ -27,6 +27,10 @@ export const EntityState = Object.freeze({
     SELECTED: "selected",
     GHOST: "ghost",
     ISOLATED: "isolated",
+    // A node revealed solely because "Show Node Labels" is on (View menu) -
+    // same orange as hover/isolated, just without their size bump since
+    // it's a passive "visible" state, not a highlight.
+    LABELED: "labeled",
     // Shape-quality overlay (Utilities > Mesh Quality > Highlight in view):
     // flags elements whose skewness/aspect-ratio crosses the warn/bad limit.
     QUALITY_WARN: "quality-warn",
@@ -45,6 +49,8 @@ export function nodeStyle(state) {
             return { color: cssVar("--hover-highlight"), radiusDelta: 1 };
         case EntityState.ISOLATED:
             return { color: cssVar("--isolate-highlight"), radiusDelta: 1 };
+        case EntityState.LABELED:
+            return { color: cssVar("--isolate-highlight"), radiusDelta: 0 };
         default:
             return { color: cssVar("--node-color"), radiusDelta: 0 };
     }
