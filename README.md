@@ -9,7 +9,7 @@ PlaneMeshForge is a web-based tool for interactively building and editing 2D str
 *   **Interactive Mesh Visualization:** Pan, zoom, and rotate on an HTML5 Canvas, with a light/dark theme and optional node/element labels.
 *   **Real elements, not just lines:** Creating a "connection" makes a real `SFMGAX1` line element; triangles (`CGAX3`) and quads (`CGAX4`) are first-class too, so everything you draw exports to `.deck`.
 *   **Selection:** Click, box-select, or lasso-select (Alt+drag) nodes; click to pick a single element. Shift adds, Ctrl toggles.
-*   **Editing tools:** Select, Add Node, Create Line/Triangle/Quad, Delete — each with a keyboard shortcut (see below) and a live overlay preview.
+*   **Editing tools:** Select, Add Node, Create Line, Create Element (triangle or quad, picked automatically from how many nodes you click), Delete — each with a keyboard shortcut (see below) and a live overlay preview. You can also select 3-4 nodes in any order with the Select tool and run "Create Element from Selection".
 *   **Inspector panel:** Edit a selected node's exact X/Y, see which elements use it; inspect a selected element's type/connectivity/area; see a bounding box and quick actions for larger selections.
 *   **Transforms:** Translate, rotate (about the centroid or a point), scale, and mirror the selected nodes.
 *   **Mesh utilities:** Merge coincident nodes (with tolerance), renumber node/element ids, split quads into triangles, and Delaunay-triangulate a selected point cloud into real triangle elements.
@@ -23,10 +23,11 @@ PlaneMeshForge is a web-based tool for interactively building and editing 2D str
 
 | Keys | Action |
 | --- | --- |
-| `V` / `N` / `L` / `T` / `Q` / `D` | Select / Add Node / Create Line / Create Triangle / Create Quad / Delete tool |
+| `V` / `N` / `L` / `E` / `D` | Select / Add Node / Create Line / Create Element / Delete tool |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
 | `Ctrl+S` / `Ctrl+Shift+S` / `Ctrl+O` | Save / Save As / Open project |
 | `Ctrl+A` | Select all nodes |
+| `Shift+E` | Create element from 3-4 selected nodes |
 | `Delete` / `Backspace` | Delete selection |
 | `F` | Fit view to mesh |
 | `G` | Toggle snap-to-grid |

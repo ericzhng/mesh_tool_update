@@ -10,6 +10,7 @@ import { viewport } from "../../render/viewport.js";
 import * as client from "../../net/client.js";
 import { toast } from "../toast.js";
 import { icon } from "../icons.js";
+import { createElementFromNodes } from "../../core/element-builder.js";
 
 function fmtMetric(n) {
     return n == null ? "–" : n.toFixed(3);
@@ -131,10 +132,21 @@ function renderMultiSelection(root) {
         info.appendChild(bboxRow);
     }
 
+    const canCreateElement = !elementIds.length && (nodeIds.length === 3 || nodeIds.length === 4);
+
     const actions = document.createElement("div");
     actions.className = "btn-row";
-    actions.innerHTML = `<button class="btn btn-danger" id="delete-selection">${icon("trash")}Delete</button>`;
+    actions.innerHTML = `
+        ${canCreateElement ? `<button class="btn" id="create-element-from-selection">${icon("quad")}Create Element</button>` : ""}
+        <button class="btn btn-danger" id="delete-selection">${icon("trash")}Delete</button>
+    `;
     info.appendChild(actions);
+    if (canCreateElement) {
+        actions.querySelector("#create-element-from-selection").addEventListener("click", async () => {
+            const result = await createElementFromNodes(nodeIds);
+            if (result.ok) selection.clear();
+        });
+    }
     actions.querySelector("#delete-selection").addEventListener("click", async () => {
         if (nodeIds.length) await client.op("delete_nodes", { ids: nodeIds });
         if (elementIds.length) await client.op("delete_elements", { ids: elementIds });

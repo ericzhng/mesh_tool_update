@@ -8,6 +8,7 @@ import { toolManager } from "../tools/tool-manager.js";
 import * as client from "../net/client.js";
 import * as project from "../project/project.js";
 import { toast } from "../ui/toast.js";
+import { createElementFromNodes } from "../core/element-builder.js";
 
 function toolCommand(id, toolId, label, icon, shortcut) {
     define({ id, label, icon, shortcut, run: () => toolManager.activate(toolId) });
@@ -50,6 +51,17 @@ export function registerCommands() {
     });
     define({ id: "edit.selectAll", label: "Select All Nodes", shortcut: "Ctrl+A", run: () => selection.selectAll() });
     define({
+        id: "edit.createElementFromSelection",
+        label: "Create Element from Selection",
+        icon: "quad",
+        shortcut: "Shift+E",
+        isEnabled: () => !selection.elementIds.size && (selection.nodeIds.size === 3 || selection.nodeIds.size === 4),
+        run: async () => {
+            const result = await createElementFromNodes([...selection.nodeIds]);
+            if (result.ok) selection.clear();
+        },
+    });
+    define({
         id: "edit.deleteSelected",
         label: "Delete Selected",
         icon: "trash",
@@ -73,8 +85,7 @@ export function registerCommands() {
     toolCommand("tool.selectSurface", "select-surface", "Select Surface", "surface", "S");
     toolCommand("tool.addNode", "add-node", "Add Node", "add-node", "N");
     toolCommand("tool.createLine", "create-line", "Create Line", "line", "L");
-    toolCommand("tool.createTriangle", "create-triangle", "Create Triangle", "triangle", "T");
-    toolCommand("tool.createQuad", "create-quad", "Create Quad", "quad", "Q");
+    toolCommand("tool.createElement", "create-element", "Create Element", "quad", "E");
     toolCommand("tool.delete", "delete", "Delete Tool", "delete-tool", "D");
 
     // ---- View ----

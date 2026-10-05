@@ -4,7 +4,7 @@ import { bus } from "../core/events.js";
 import { get, run } from "../commands/registry.js";
 import { icon } from "./icons.js";
 
-const TOOL_COMMANDS = ["tool.select", "tool.selectSurface", "tool.addNode", "tool.createLine", "tool.createTriangle", "tool.createQuad", "tool.delete"];
+const TOOL_COMMANDS = ["tool.select", "tool.selectSurface", "tool.addNode", "tool.createLine", "tool.createElement", "tool.delete"];
 
 export function buildToolRail(container) {
     const buttons = new Map();
@@ -32,8 +32,7 @@ function toolMapping(commandId) {
         "tool.selectSurface": "select-surface",
         "tool.addNode": "add-node",
         "tool.createLine": "create-line",
-        "tool.createTriangle": "create-triangle",
-        "tool.createQuad": "create-quad",
+        "tool.createElement": "create-element",
         "tool.delete": "delete",
     }[commandId];
 }

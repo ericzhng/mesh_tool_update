@@ -10,7 +10,7 @@ import { toolManager } from "./tools/tool-manager.js";
 import { selectTool } from "./tools/select.js";
 import { selectSurfaceTool } from "./tools/select-surface.js";
 import { addNodeTool } from "./tools/add-node.js";
-import { createLineTool, createTriangleTool, createQuadTool } from "./tools/create-element.js";
+import { createLineTool, createElementTool } from "./tools/create-element.js";
 import { deleteTool } from "./tools/delete.js";
 import { registerCommands } from "./commands/commands.js";
 import { run } from "./commands/registry.js";
@@ -76,8 +76,7 @@ async function main() {
     toolManager.register(selectSurfaceTool);
     toolManager.register(addNodeTool);
     toolManager.register(createLineTool);
-    toolManager.register(createTriangleTool);
-    toolManager.register(createQuadTool);
+    toolManager.register(createElementTool);
     toolManager.register(deleteTool);
     toolManager.activate("select");
 

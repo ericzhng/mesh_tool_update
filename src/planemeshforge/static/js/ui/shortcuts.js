@@ -12,12 +12,12 @@ const BINDINGS = [
     { keys: "ctrl+a", command: "edit.selectAll" },
     { keys: "delete", command: "edit.deleteSelected" },
     { keys: "backspace", command: "edit.deleteSelected" },
+    { keys: "shift+e", command: "edit.createElementFromSelection" },
     { keys: "v", command: "tool.select" },
     { keys: "s", command: "tool.selectSurface" },
     { keys: "n", command: "tool.addNode" },
     { keys: "l", command: "tool.createLine" },
-    { keys: "t", command: "tool.createTriangle" },
-    { keys: "q", command: "tool.createQuad" },
+    { keys: "e", command: "tool.createElement" },
     { keys: "d", command: "tool.delete" },
     { keys: "f", command: "view.fit" },
     { keys: "g", command: "view.toggleSnap" },
@@ -43,6 +43,7 @@ function isTypingTarget(el) {
 export function installShortcuts() {
     window.addEventListener("keydown", e => {
         if (isTypingTarget(e.target) && e.key !== "Escape") return;
+        if (e.defaultPrevented) return;
         const combo = comboFor(e);
         const binding = BINDINGS.find(b => b.keys === combo);
         if (binding) {
