@@ -116,16 +116,32 @@ function renderSingleElement(root, elementId) {
 function renderMultiSelection(root) {
     const nodeIds = [...selection.nodeIds];
     const elementIds = [...selection.elementIds];
+    const faceKeys = [...selection.faceKeys];
     const info = section("Selection");
 
     const count = document.createElement("div");
     count.className = "empty-hint";
-    count.textContent = `${nodeIds.length} node(s), ${elementIds.length} element(s) selected`;
+    count.textContent =
+        `${nodeIds.length} node(s), ${elementIds.length} element(s)` +
+        `${faceKeys.length ? `, ${faceKeys.length} edge(s)` : ""} selected`;
     info.appendChild(count);
 
-    if (nodeIds.length > 1) {
-        const points = nodeIds.map(id => store.node(id)).filter(Boolean);
-        const bbox = boundingBox(points);
+    // Widen the bbox beyond just directly-selected nodes to every node
+    // referenced by a selected element/edge too, so a combined box-select
+    // (which often has no bare nodeIds at all) still shows a meaningful
+    // extent instead of silently dropping the row.
+    const bboxNodeIds = new Set(nodeIds);
+    for (const id of elementIds) store.element(id)?.node_ids.forEach(n => bboxNodeIds.add(n));
+    for (const key of faceKeys) {
+        const edge = store.edgeFaceMap.get(key);
+        if (edge) {
+            bboxNodeIds.add(edge.a);
+            bboxNodeIds.add(edge.b);
+        }
+    }
+    const bboxPoints = [...bboxNodeIds].map(id => store.node(id)).filter(Boolean);
+    if (bboxPoints.length > 1) {
+        const bbox = boundingBox(bboxPoints);
         const bboxRow = document.createElement("div");
         bboxRow.className = "empty-hint";
         bboxRow.textContent = `bbox: (${bbox.minX.toFixed(3)}, ${bbox.minY.toFixed(3)}) → (${bbox.maxX.toFixed(3)}, ${bbox.maxY.toFixed(3)})`;
@@ -133,12 +149,16 @@ function renderMultiSelection(root) {
     }
 
     const canCreateElement = !elementIds.length && (nodeIds.length === 3 || nodeIds.length === 4);
+    // Faces aren't directly deletable (they're derived from their owning
+    // element, not a separate entity) - a faces-only selection has nothing
+    // for this button to do, so skip it rather than show a no-op action.
+    const canDelete = nodeIds.length > 0 || elementIds.length > 0;
 
     const actions = document.createElement("div");
     actions.className = "btn-row";
     actions.innerHTML = `
         ${canCreateElement ? `<button class="btn" id="create-element-from-selection">${icon("quad")}Create Element</button>` : ""}
-        <button class="btn btn-danger" id="delete-selection">${icon("trash")}Delete</button>
+        ${canDelete ? `<button class="btn btn-danger" id="delete-selection">${icon("trash")}Delete</button>` : ""}
     `;
     info.appendChild(actions);
     if (canCreateElement) {
@@ -147,11 +167,13 @@ function renderMultiSelection(root) {
             if (result.ok) selection.clear();
         });
     }
-    actions.querySelector("#delete-selection").addEventListener("click", async () => {
-        if (nodeIds.length) await client.op("delete_nodes", { ids: nodeIds });
-        if (elementIds.length) await client.op("delete_elements", { ids: elementIds });
-        selection.clear();
-    });
+    if (canDelete) {
+        actions.querySelector("#delete-selection").addEventListener("click", async () => {
+            if (nodeIds.length) await client.op("delete_nodes", { ids: nodeIds });
+            if (elementIds.length) await client.op("delete_elements", { ids: elementIds });
+            selection.clear();
+        });
+    }
 
     root.appendChild(info);
 }
@@ -187,16 +209,17 @@ export function buildInspectorPanel(root) {
         root.innerHTML = "";
         const nodeCount = selection.nodeIds.size;
         const elementCount = selection.elementIds.size;
+        const faceCount = selection.faceKeys.size;
 
-        if (nodeCount === 0 && elementCount === 0) {
+        if (nodeCount === 0 && elementCount === 0 && faceCount === 0) {
             renderNothingSelected(root);
             return;
         }
-        if (nodeCount === 1 && elementCount === 0) {
+        if (nodeCount === 1 && elementCount === 0 && faceCount === 0) {
             renderSingleNode(root, [...selection.nodeIds][0]);
             return;
         }
-        if (elementCount === 1 && nodeCount === 0) {
+        if (elementCount === 1 && nodeCount === 0 && faceCount === 0) {
             renderSingleElement(root, [...selection.elementIds][0]);
             return;
         }

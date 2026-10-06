@@ -3,12 +3,19 @@ and quad-to-triangle splitting."""
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
 from ..abaqus_io import Mesh, ElementBlock
+from ..abaqus_io.deck_utility import surface_pairs
+
+_NUMERIC_RE = re.compile(r"^-?\d+$")
 
 
-def signed_areas(points: np.ndarray, point_ids: list[int], connectivity: np.ndarray) -> np.ndarray:
+def signed_areas(
+    points: np.ndarray, point_ids: list[int], connectivity: np.ndarray
+) -> np.ndarray:
     """Shoelace-formula signed area of every row (element) in `connectivity`.
 
     Positive for counter-clockwise node order, negative for clockwise, zero
@@ -37,7 +44,9 @@ def orient_ccw(mesh: Mesh) -> list[int]:
         if not reverse_mask.any():
             continue
         conn = block.connectivity[reverse_mask]
-        block.connectivity[reverse_mask] = np.concatenate([conn[:, :1], conn[:, :0:-1]], axis=1)
+        block.connectivity[reverse_mask] = np.concatenate(
+            [conn[:, :1], conn[:, :0:-1]], axis=1
+        )
         fixed_ids.extend(int(e) for e in block.ids[reverse_mask])
     return fixed_ids
 
@@ -81,7 +90,42 @@ def next_element_id(mesh: Mesh) -> int:
     return max_id + 1
 
 
-def merge_coincident_nodes(mesh: Mesh, tolerance: float = 1e-6, node_ids: list[int] | None = None) -> dict[int, int]:
+def remap_surface_sets(
+    mesh: Mesh,
+    element_id_map: dict[int, int] | None = None,
+    removed_element_ids: list[int] | None = None,
+) -> None:
+    """Keeps `*SURFACE, TYPE=ELEMENT` tokens in sync with element id changes.
+
+    Surface-set tokens are either a direct element id (renumbered/dropped
+    here) or a reference to a named element set (left alone - the name
+    itself doesn't change). Call this after any op that renumbers or
+    removes elements (`renumber`, `delete_nodes`'s element cascade,
+    `delete_elements`, `split_quads`) - `create_set`/`rename_set` already
+    keep `node_sets`/`elem_sets` in sync the same way, but nothing did this
+    for surface sets, so they went stale after those ops.
+    """
+    removed = set(removed_element_ids or [])
+    for name, tokens in list(mesh.surface_sets.items()):
+        new_tokens: list[str] = []
+        for token, label in surface_pairs(tokens):
+            if _NUMERIC_RE.match(token):
+                element_id = int(token)
+                if element_id in removed:
+                    continue
+                if element_id_map is not None:
+                    element_id = element_id_map.get(element_id, element_id)
+                new_tokens.append(str(element_id))
+            else:
+                new_tokens.append(token)
+            if label is not None:
+                new_tokens.append(label)
+        mesh.surface_sets[name] = new_tokens
+
+
+def merge_coincident_nodes(
+    mesh: Mesh, tolerance: float = 1e-6, node_ids: list[int] | None = None
+) -> dict[int, int]:
     """Merges nodes that are within `tolerance` of each other.
 
     If `node_ids` is given, only those nodes are considered as merge
@@ -122,7 +166,11 @@ def merge_coincident_nodes(mesh: Mesh, tolerance: float = 1e-6, node_ids: list[i
         return merge_map.get(node_id, node_id)
 
     for block in mesh.cells:
-        block.connectivity = np.vectorize(remap)(block.connectivity) if block.connectivity.size else block.connectivity
+        block.connectivity = (
+            np.vectorize(remap)(block.connectivity)
+            if block.connectivity.size
+            else block.connectivity
+        )
 
     for name, ids in mesh.node_sets.items():
         mesh.node_sets[name] = sorted({remap(i) for i in ids})
@@ -152,10 +200,13 @@ def renumber(mesh: Mesh, start: int = 1) -> tuple[dict[int, int], dict[int, int]
         for i in range(len(block.ids)):
             element_id_map[int(block.ids[i])] = next_id
             next_id += 1
-        block.ids = np.array([element_id_map[int(old)] for old in block.ids], dtype=np.int32)
+        block.ids = np.array(
+            [element_id_map[int(old)] for old in block.ids], dtype=np.int32
+        )
 
     for name, ids in mesh.elem_sets.items():
         mesh.elem_sets[name] = sorted(element_id_map[i] for i in ids)
+    remap_surface_sets(mesh, element_id_map=element_id_map)
 
     mesh._validate_data()
     return node_id_map, element_id_map
@@ -192,7 +243,13 @@ def split_quads(mesh: Mesh, element_ids: list[int]) -> list[int]:
             next_id += 1
 
         if keep_mask.any():
-            remaining_blocks.append(ElementBlock(block.element_type, block.ids[keep_mask], block.connectivity[keep_mask]))
+            remaining_blocks.append(
+                ElementBlock(
+                    block.element_type,
+                    block.ids[keep_mask],
+                    block.connectivity[keep_mask],
+                )
+            )
 
     mesh.cells = remaining_blocks
     if new_conn:
@@ -201,6 +258,7 @@ def split_quads(mesh: Mesh, element_ids: list[int]) -> list[int]:
 
     for name in list(mesh.elem_sets):
         mesh.elem_sets[name] = [i for i in mesh.elem_sets[name] if i not in target_ids]
+    remap_surface_sets(mesh, removed_element_ids=list(target_ids))
 
     mesh._validate_data()
     return new_ids

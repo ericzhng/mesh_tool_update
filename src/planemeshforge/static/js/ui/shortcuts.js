@@ -14,7 +14,6 @@ const BINDINGS = [
     { keys: "backspace", command: "edit.deleteSelected" },
     { keys: "shift+e", command: "edit.createElementFromSelection" },
     { keys: "v", command: "tool.select" },
-    { keys: "s", command: "tool.selectSurface" },
     { keys: "n", command: "tool.addNode" },
     { keys: "l", command: "tool.createLine" },
     { keys: "e", command: "tool.createElement" },

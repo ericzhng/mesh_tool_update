@@ -1,13 +1,12 @@
 // The default tool: click to pick a node, element, or edge ("surface");
 // box/lasso to multi-select; drag to move the current node selection.
-// A persistent filter - `V` for nodes/elements, `S` for edges - decides
-// which kind a click or box resolves to, Abaqus/HyperMesh-style: one tool,
-// one set of box/lasso/drag/shift/ctrl mechanics, with the filter just
-// narrowing what counts as a hit. Switching filters doesn't touch the
-// current selection, so you can grab some nodes, flip to the edge filter,
-// and add edges without losing them - selection.js itself still only holds
-// one kind at a time, so adding an edge after nodes replaces them, same as
-// clicking a node after edges would.
+// One smart selection, no mode/filter to switch: a single click resolves
+// by priority (node > edge > element - a boundary-line click reads as "the
+// edge", an interior click as "the element"), and a box/lasso drag gathers
+// all three kinds from the same region in one pass. selection.js keeps the
+// three kinds as independent sets, so a combined box-select can carry
+// nodes, elements, and edges at once - e.g. to split into separate node/
+// element/surface sets afterward (see the Sets panel).
 import { store } from "../core/store.js";
 import { selection } from "../core/selection.js";
 import { hover } from "../core/hover.js";
@@ -18,31 +17,12 @@ import { hitNode, hitElement, hitEdge, pickRadiusWorld } from "../core/hit-test.
 
 export const selectTool = {
     id: "select",
+    label: "Select",
     cursor: "default",
-    // "point" = nodes/elements (the historical default-tool behavior),
-    // "edge" = surfaces (the historical select-surface-tool behavior).
-    filter: "point",
+    hint: "Click to select a node/edge/element · drag to move · box/Alt+drag to lasso · Shift adds · Ctrl toggles",
 
     _drag: null, // { nodeIds, starts: Map(id -> {x,y}), pointerStart }
     _box: null, // { start, current, lasso: bool, points: [] }
-
-    get label() {
-        return this.filter === "edge" ? "Select Surface" : "Select";
-    },
-
-    get hint() {
-        return this.filter === "edge"
-            ? "Click an edge to select · box/Alt+drag to lasso · Shift adds · Ctrl toggles"
-            : "Click to select · drag to move · box/Alt+drag to lasso · Shift adds · Ctrl toggles";
-    },
-
-    setFilter(filter) {
-        if (this.filter === filter) return;
-        this.filter = filter;
-        this._drag = null;
-        this._box = null;
-        hover.clear();
-    },
 
     onDeactivate() {
         hover.clear();
@@ -51,23 +31,20 @@ export const selectTool = {
     },
 
     onPointerDown(e, world) {
-        if (this.filter === "edge") {
-            const edge = hitEdge(world);
-            if (edge) {
-                this._handleEdgeHit(e, edge);
-                return;
-            }
-        } else {
-            const node = hitNode(world);
-            if (node) {
-                this._handleNodeHit(e, node, world);
-                return;
-            }
-            const element = hitElement(world);
-            if (element) {
-                this._handleElementHit(e, element);
-                return;
-            }
+        const node = hitNode(world);
+        if (node) {
+            this._handleNodeHit(e, node, world);
+            return;
+        }
+        const edge = hitEdge(world);
+        if (edge) {
+            this._handleEdgeHit(e, edge);
+            return;
+        }
+        const element = hitElement(world);
+        if (element) {
+            this._handleElementHit(e, element);
+            return;
         }
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) selection.clear();
         this._box = { start: world, current: world, lasso: e.altKey, points: [world] };
@@ -94,26 +71,25 @@ export const selectTool = {
 
     _handleElementHit(e, element) {
         if (e.ctrlKey || e.metaKey) selection.toggleElement(element.id);
-        else if (e.shiftKey) selection.setElements([...selection.elementIds, element.id]);
+        else if (e.shiftKey) selection.addElements([element.id]);
         else selection.setElements([element.id]);
     },
 
     _handleEdgeHit(e, edge) {
         if (e.ctrlKey || e.metaKey) selection.toggleFace(edge.key);
-        else if (e.shiftKey) selection.setFaces([...selection.faceKeys, edge.key]);
+        else if (e.shiftKey) selection.addFaces([edge.key]);
         else selection.setFaces([edge.key]);
     },
 
     onPointerMove(e, world) {
         if (!this._drag && !this._box) {
-            if (this.filter === "edge") {
-                const edge = hitEdge(world);
-                if (edge) hover.setFace(edge.key);
-                else hover.clear();
+            const node = hitNode(world);
+            if (node) {
+                hover.setNode(node.id);
             } else {
-                const node = hitNode(world);
-                if (node) {
-                    hover.setNode(node.id);
+                const edge = hitEdge(world);
+                if (edge) {
+                    hover.setFace(edge.key);
                 } else {
                     const element = hitElement(world);
                     if (element) hover.setElement(element.id);
@@ -158,66 +134,53 @@ export const selectTool = {
             return;
         }
         if (this._box) {
-            if (this.filter === "edge") this._finishBoxSelectEdges(e);
-            else this._finishBoxSelectNodes(e);
+            this._finishBoxSelect(e);
             this._box = null;
         }
     },
 
-    _finishBoxSelectNodes(e) {
-        const box = this._box;
-        const moved = Math.hypot(box.current.x - box.start.x, box.current.y - box.start.y) > pickRadiusWorld() * 0.5;
-        if (!moved) return;
-
-        let hits;
-        if (box.lasso) {
-            hits = store.mesh.nodes.filter(n => store.isNodeVisible(n.id) && pointInPolygon(n, box.points));
-        } else {
-            const minX = Math.min(box.start.x, box.current.x);
-            const maxX = Math.max(box.start.x, box.current.x);
-            const minY = Math.min(box.start.y, box.current.y);
-            const maxY = Math.max(box.start.y, box.current.y);
-            hits = store.mesh.nodes.filter(
-                n => store.isNodeVisible(n.id) && n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY
-            );
-        }
-        const ids = hits.map(n => n.id);
-
-        if (e.ctrlKey || e.metaKey) {
-            const toRemove = ids.filter(id => selection.nodeIds.has(id));
-            const toAdd = ids.filter(id => !selection.nodeIds.has(id));
-            selection.removeNodes(toRemove);
-            selection.addNodes(toAdd);
-        } else if (e.shiftKey) {
-            selection.addNodes(ids);
-        } else {
-            selection.setNodes(ids);
-        }
-    },
-
-    _finishBoxSelectEdges(e) {
+    _finishBoxSelect(e) {
         const box = this._box;
         const moved = Math.hypot(box.current.x - box.start.x, box.current.y - box.start.y) > pickRadiusWorld() * 0.5;
         if (!moved) return;
 
         const within = point => (box.lasso ? pointInPolygon(point, box.points) : inBox(point, box));
-        const hits = store.edgeFaces.filter(edge => {
+
+        const nodeHits = store.mesh.nodes.filter(n => store.isNodeVisible(n.id) && within(n));
+        const nodeIds = nodeHits.map(n => n.id);
+
+        const elementHits = store.mesh.elements.filter(el => {
+            if (!store.isElementVisible(el.id)) return false;
+            return el.node_ids.every(id => {
+                const n = store.node(id);
+                return n && within(n);
+            });
+        });
+        const elementIds = elementHits.map(el => el.id);
+
+        const edgeHits = store.edgeFaces.filter(edge => {
             if (!store.isEdgeVisible(edge)) return false;
             const a = store.node(edge.a);
             const b = store.node(edge.b);
             return a && b && within(a) && within(b);
         });
-        const keys = hits.map(edge => edge.key);
+        const faceKeys = edgeHits.map(edge => edge.key);
 
         if (e.ctrlKey || e.metaKey) {
-            const toRemove = keys.filter(key => selection.faceKeys.has(key));
-            const toAdd = keys.filter(key => !selection.faceKeys.has(key));
-            selection.removeFaces(toRemove);
-            selection.addFaces(toAdd);
+            toggleHits(selection.nodeIds, nodeIds, selection.addNodes.bind(selection), selection.removeNodes.bind(selection));
+            toggleHits(
+                selection.elementIds,
+                elementIds,
+                selection.addElements.bind(selection),
+                selection.removeElements.bind(selection)
+            );
+            toggleHits(selection.faceKeys, faceKeys, selection.addFaces.bind(selection), selection.removeFaces.bind(selection));
         } else if (e.shiftKey) {
-            selection.addFaces(keys);
+            selection.addNodes(nodeIds);
+            selection.addElements(elementIds);
+            selection.addFaces(faceKeys);
         } else {
-            selection.setFaces(keys);
+            selection.replaceAll({ nodes: nodeIds, elements: elementIds, faces: faceKeys });
         }
     },
 
@@ -264,4 +227,14 @@ function inBox(point, box) {
     const minY = Math.min(box.start.y, box.current.y);
     const maxY = Math.max(box.start.y, box.current.y);
     return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY;
+}
+
+// Ctrl/box-select toggles each hit within its own kind: already-selected
+// hits drop out, new ones get added - same "toggle" semantics as a single
+// ctrl-click, just applied to a whole box's worth of hits at once.
+function toggleHits(currentSet, hitIds, add, remove) {
+    const toRemove = hitIds.filter(id => currentSet.has(id));
+    const toAdd = hitIds.filter(id => !currentSet.has(id));
+    remove(toRemove);
+    add(toAdd);
 }

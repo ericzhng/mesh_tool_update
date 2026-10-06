@@ -42,7 +42,11 @@ export function buildStatusBar(root, canvas, toolHintEl) {
     function refreshSelection() {
         const n = selection.nodeIds.size;
         const e = selection.elementIds.size;
-        selectionEl.textContent = n || e ? `${n} node${n === 1 ? "" : "s"}${e ? `, ${e} element${e === 1 ? "" : "s"}` : ""} selected` : "";
+        const f = selection.faceKeys.size;
+        selectionEl.textContent =
+            n || e || f
+                ? `${n} node${n === 1 ? "" : "s"}${e ? `, ${e} element${e === 1 ? "" : "s"}` : ""}${f ? `, ${f} edge${f === 1 ? "" : "s"}` : ""} selected`
+                : "";
     }
 
     function refreshZoom() {

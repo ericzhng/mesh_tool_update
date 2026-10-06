@@ -21,25 +21,27 @@ class Selection {
         return this.nodeIds.size === 0 && this.elementIds.size === 0 && this.faceKeys.size === 0;
     }
 
-    setNodes(ids) {
-        this.nodeIds = new Set(ids);
-        this.elementIds.clear();
-        this.faceKeys.clear();
+    // Sets all three kinds in one atomic step - needed for a combined
+    // box-select, since setNodes/setElements/setFaces each intentionally
+    // clear the other two kinds and would clobber each other if called in
+    // sequence for the same drag.
+    replaceAll({ nodes = [], elements = [], faces = [] } = {}) {
+        this.nodeIds = new Set(nodes);
+        this.elementIds = new Set(elements);
+        this.faceKeys = new Set(faces);
         this._changed();
+    }
+
+    setNodes(ids) {
+        this.replaceAll({ nodes: ids });
     }
 
     setElements(ids) {
-        this.elementIds = new Set(ids);
-        this.nodeIds.clear();
-        this.faceKeys.clear();
-        this._changed();
+        this.replaceAll({ elements: ids });
     }
 
     setFaces(keys) {
-        this.faceKeys = new Set(keys);
-        this.nodeIds.clear();
-        this.elementIds.clear();
-        this._changed();
+        this.replaceAll({ faces: keys });
     }
 
     addFaces(keys) {
@@ -77,6 +79,16 @@ class Selection {
     toggleElement(id) {
         if (this.elementIds.has(id)) this.elementIds.delete(id);
         else this.elementIds.add(id);
+        this._changed();
+    }
+
+    addElements(ids) {
+        ids.forEach(id => this.elementIds.add(id));
+        this._changed();
+    }
+
+    removeElements(ids) {
+        ids.forEach(id => this.elementIds.delete(id));
         this._changed();
     }
 

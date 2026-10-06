@@ -90,6 +90,7 @@ def delete_nodes(mesh: Mesh, ids: list[int]) -> dict:
     removed_set = set(removed_element_ids)
     for name in list(mesh.elem_sets):
         mesh.elem_sets[name] = [i for i in mesh.elem_sets[name] if i not in removed_set]
+    topo.remap_surface_sets(mesh, removed_element_ids=removed_element_ids)
 
     return {"removed_element_ids": removed_element_ids}
 
@@ -134,6 +135,7 @@ def delete_elements(mesh: Mesh, ids: list[int]) -> dict:
 
     for name in list(mesh.elem_sets):
         mesh.elem_sets[name] = [i for i in mesh.elem_sets[name] if i not in id_set]
+    topo.remap_surface_sets(mesh, removed_element_ids=ids)
     return {}
 
 

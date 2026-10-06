@@ -4,7 +4,7 @@ import { bus } from "../core/events.js";
 import { get, run } from "../commands/registry.js";
 import { icon } from "./icons.js";
 
-const TOOL_COMMANDS = ["tool.select", "tool.selectSurface", "tool.addNode", "tool.createLine", "tool.createElement", "tool.delete"];
+const TOOL_COMMANDS = ["tool.select", "tool.addNode", "tool.createLine", "tool.createElement", "tool.delete"];
 
 export function buildToolRail(container) {
     const buttons = new Map();
@@ -21,23 +21,14 @@ export function buildToolRail(container) {
 
     bus.on("tool:changed", activeTool => {
         for (const [id, btn] of buttons) {
-            btn.classList.toggle("active", isActiveFor(id, activeTool));
+            btn.classList.toggle("active", activeTool && activeTool.id === toolMapping(id));
         }
     });
 }
 
-// "Select" and "Select Surface" both activate the same underlying tool
-// (tools/select.js) and just set its entity-type filter, so telling them
-// apart in the rail needs the filter, not just the active tool's id.
-function isActiveFor(commandId, activeTool) {
-    if (!activeTool) return false;
-    if (commandId === "tool.select") return activeTool.id === "select" && activeTool.filter === "point";
-    if (commandId === "tool.selectSurface") return activeTool.id === "select" && activeTool.filter === "edge";
-    return activeTool.id === toolMapping(commandId);
-}
-
 function toolMapping(commandId) {
     return {
+        "tool.select": "select",
         "tool.addNode": "add-node",
         "tool.createLine": "create-line",
         "tool.createElement": "create-element",

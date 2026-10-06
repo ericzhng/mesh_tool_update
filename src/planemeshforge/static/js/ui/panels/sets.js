@@ -134,31 +134,51 @@ export function buildSetsPanel(root) {
         return details;
     }
 
+    // A combined box-select routinely carries nodes, elements, and edges at
+    // once now (see tools/select.js) - rather than silently picking one
+    // kind, offer one "Create X Set" button per non-empty kind so the same
+    // selection can be split into separate sets.
+    const CREATE_KINDS = [
+        { kind: "node", label: "Node", iconName: "add-node", count: () => selection.nodeIds.size },
+        { kind: "element", label: "Element", iconName: "quad", count: () => selection.elementIds.size },
+        { kind: "surface", label: "Surface", iconName: "surface", count: () => selection.faceKeys.size },
+    ];
+
+    async function createSetFromSelection(kind) {
+        const values = await openDialog({ title: "Create Set", fields: [{ name: "name", label: "Name", default: `${kind}Set1` }] });
+        if (!values?.name) return;
+        let result;
+        if (kind === "surface") {
+            const faces = [...selection.faceKeys].map(key => key.split(":").map(Number));
+            result = await client.op("create_surface", { name: values.name, faces });
+        } else {
+            const ids = kind === "node" ? [...selection.nodeIds] : [...selection.elementIds];
+            result = await client.op("create_set", { set_kind: kind, name: values.name, ids });
+        }
+        if (!result.ok) toast.error(result.error);
+    }
+
     function render() {
         root.innerHTML = "";
 
         const createSection = document.createElement("div");
         createSection.className = "panel-section";
-        createSection.innerHTML = `<div class="btn-row"><button class="btn btn-primary" id="create-set">${icon("plus")}Create Set from Selection</button></div>`;
+        const present = CREATE_KINDS.filter(k => k.count() > 0);
+        if (!present.length) {
+            createSection.innerHTML = `<div class="empty-hint">Select some nodes, elements, or surface edges first.</div>`;
+        } else {
+            const row = document.createElement("div");
+            row.className = "btn-row";
+            present.forEach(({ kind, label, iconName, count }) => {
+                const btn = document.createElement("button");
+                btn.className = "btn btn-primary";
+                btn.innerHTML = `${icon(iconName)}Create ${label} Set (${count()})`;
+                btn.addEventListener("click", () => createSetFromSelection(kind));
+                row.appendChild(btn);
+            });
+            createSection.appendChild(row);
+        }
         root.appendChild(createSection);
-        createSection.querySelector("#create-set").addEventListener("click", async () => {
-            const kind = selection.nodeIds.size ? "node" : selection.elementIds.size ? "element" : selection.faceKeys.size ? "surface" : null;
-            if (!kind) {
-                toast.info("Select some nodes, elements, or surface edges first.");
-                return;
-            }
-            const values = await openDialog({ title: "Create Set", fields: [{ name: "name", label: "Name", default: `${kind}Set1` }] });
-            if (!values?.name) return;
-            let result;
-            if (kind === "surface") {
-                const faces = [...selection.faceKeys].map(key => key.split(":").map(Number));
-                result = await client.op("create_surface", { name: values.name, faces });
-            } else {
-                const ids = kind === "node" ? [...selection.nodeIds] : [...selection.elementIds];
-                result = await client.op("create_set", { set_kind: kind, name: values.name, ids });
-            }
-            if (!result.ok) toast.error(result.error);
-        });
 
         async function editSimpleMembers(kind, name, ids) {
             const values = await openDialog({
