@@ -1,17 +1,19 @@
 // The Sets dock tab: node/element/surface sets, each with per-set
-// visibility, isolate, highlight, rename, edit-members, and delete. "Edit
-// members" (the list icon, next to rename) lets you replace a set's whole
-// membership by typing ids directly - node/element sets as a plain id list,
-// face-based surface sets as `element:face` pairs - rather than only being
-// able to rebuild one via Create Set from Selection. Surface sets store
-// `*SURFACE, TYPE=ELEMENT` tokens - a direct element id or (for sets
-// imported from a deck) a reference to a named element set, each optionally
-// followed by a face label like `S1`. `resolveSurfaceFaces` turns the
-// labeled ones back into edge-face keys for highlighting; unlabeled ones
+// visibility, isolate, and delete, plus a combined rename/edit-members
+// editor. The editor docks inline at the top of this tab (see
+// ui/panels/set-editor.js) instead of opening a centered modal, so the mesh
+// view stays fully visible while editing - and it lets the viewport
+// selection itself drive membership (pick/box to add or remove, typed ids
+// or a Highlight field the other way), not just a typed id list. Surface
+// sets store `*SURFACE, TYPE=ELEMENT` tokens - a direct element id or (for
+// sets imported from a deck) a reference to a named element set, each
+// optionally followed by a face label like `S1`. `resolveSurfaceFaces` turns
+// the labeled ones back into edge-face keys for highlighting; unlabeled ones
 // (a bare element-set reference, same as Abaqus itself does for a *SURFACE
 // built from whole element sets) resolve to that set's share of the mesh's
-// boundary edges instead - only a surface with no edges at all (every
-// token numeric/unresolvable) falls back to highlighting its elements.
+// boundary edges instead - only a surface with no edges at all (every token
+// numeric/unresolvable) falls back to highlighting its elements, and can
+// only be renamed, not picked (see the `legacy` editor mode).
 // Hiding/isolating a surface set only affects the edge line itself
 // (`store.isEdgeVisible`), never the owning element's own rendering.
 import { bus } from "../../core/events.js";
@@ -20,19 +22,11 @@ import { selection } from "../../core/selection.js";
 import { scheduleDraw } from "../../render/renderer.js";
 import { resolveSurfaceFaces, resolveSurfaceElementIds } from "../../core/surfaces.js";
 import * as client from "../../net/client.js";
-import { openDialog } from "../dialogs.js";
 import { toast } from "../toast.js";
 import { icon } from "../icons.js";
+import { openSetEditor, closeSetEditor, isSetEditorOpen } from "./set-editor.js";
 
-// "1, 2 3\n4" -> [1, 2, 3, 4] - accepts commas, spaces, and newlines as
-// separators since that's whatever's easiest to paste from elsewhere, and
-// de-dupes since the server would anyway (create_set/create_surface sort+
-// dedupe their id lists).
-function parseIdList(text) {
-    return [...new Set((text || "").split(/[\s,]+/).map(s => s.trim()).filter(Boolean).map(Number).filter(Number.isInteger))];
-}
-
-function setRow({ kind, name, count, onSelect, showIsolate, showHide, showEdit, onEditMembers }) {
+function setRow({ kind, name, count, onSelect, showIsolate, showHide, showEdit, onEdit }) {
     const row = document.createElement("div");
     row.className = "set-row";
 
@@ -77,24 +71,11 @@ function setRow({ kind, name, count, onSelect, showIsolate, showHide, showEdit, 
 
     if (!showEdit) return row;
 
-    const renameBtn = document.createElement("button");
-    renameBtn.title = "Rename";
-    renameBtn.innerHTML = icon("rename");
-    renameBtn.addEventListener("click", async () => {
-        const values = await openDialog({ title: "Rename Set", fields: [{ name: "new_name", label: "New name", default: name }] });
-        if (!values?.new_name) return;
-        const result = await client.op("rename_set", { set_kind: kind, name, new_name: values.new_name });
-        if (!result.ok) toast.error(result.error);
-    });
-    row.appendChild(renameBtn);
-
-    if (onEditMembers) {
-        const editBtn = document.createElement("button");
-        editBtn.title = "Edit members";
-        editBtn.innerHTML = icon("check-list");
-        editBtn.addEventListener("click", onEditMembers);
-        row.appendChild(editBtn);
-    }
+    const editBtn = document.createElement("button");
+    editBtn.title = "Rename / edit members";
+    editBtn.innerHTML = icon("rename");
+    editBtn.addEventListener("click", () => onEdit());
+    row.appendChild(editBtn);
 
     const deleteBtn = document.createElement("button");
     deleteBtn.title = "Delete set";
@@ -114,6 +95,14 @@ export function buildSetsPanel(root) {
     // selects its members) - otherwise collapsing one group would pop back
     // open as soon as you clicked anything else in the panel.
     const openGroups = { "Node Sets": true, "Element Sets": true, "Surface Sets": true };
+
+    // The editor (ui/panels/set-editor.js) owns `editorHost` directly and
+    // outlives `render()` - it must never be touched by the innerHTML reset
+    // below, or every selection change while editing would wipe out its
+    // inputs and caret position.
+    const editorHost = document.createElement("div");
+    const listHost = document.createElement("div");
+    root.append(editorHost, listHost);
 
     function group(title, rows) {
         const details = document.createElement("details");
@@ -144,22 +133,43 @@ export function buildSetsPanel(root) {
         { kind: "surface", label: "Surface", iconName: "surface", count: () => selection.faceKeys.size },
     ];
 
-    async function createSetFromSelection(kind) {
-        const values = await openDialog({ title: "Create Set", fields: [{ name: "name", label: "Name", default: `${kind}Set1` }] });
-        if (!values?.name) return;
-        let result;
-        if (kind === "surface") {
-            const faces = [...selection.faceKeys].map(key => key.split(":").map(Number));
-            result = await client.op("create_surface", { name: values.name, faces });
-        } else {
-            const ids = kind === "node" ? [...selection.nodeIds] : [...selection.elementIds];
-            result = await client.op("create_set", { set_kind: kind, name: values.name, ids });
-        }
-        if (!result.ok) toast.error(result.error);
+    function createSetFromSelection(kind) {
+        const ids = kind === "node" ? [...selection.nodeIds] : kind === "element" ? [...selection.elementIds] : [];
+        const faces = kind === "surface" ? [...selection.faceKeys].map(key => key.split(":").map(Number)) : [];
+        openSetEditor(editorHost, {
+            kind,
+            name: null,
+            isNew: true,
+            ids,
+            faces,
+            onClose: render,
+        });
+        render();
+    }
+
+    function editSet(kind, name, ids) {
+        openSetEditor(editorHost, { kind, name, isNew: false, ids, onClose: render });
+        render();
+    }
+
+    function editSurfaceSet(name, faceKeys) {
+        const faces = faceKeys.map(key => key.split(":").map(Number));
+        openSetEditor(editorHost, { kind: "surface", name, isNew: false, faces, onClose: render });
+        render();
+    }
+
+    function editLegacySurfaceSet(name) {
+        openSetEditor(editorHost, { kind: "surface", name, isNew: false, legacy: true, onClose: render });
+        render();
     }
 
     function render() {
-        root.innerHTML = "";
+        listHost.innerHTML = "";
+        // Only one set is ever being worked on at a time - while the editor
+        // is open, the rest of the list is just along for the ride (so
+        // another row's "select members" click can't clobber the editor's
+        // working selection out from under it).
+        listHost.classList.toggle("sets-list-busy", isSetEditorOpen());
 
         const createSection = document.createElement("div");
         createSection.className = "panel-section";
@@ -178,18 +188,7 @@ export function buildSetsPanel(root) {
             });
             createSection.appendChild(row);
         }
-        root.appendChild(createSection);
-
-        async function editSimpleMembers(kind, name, ids) {
-            const values = await openDialog({
-                title: `Edit Members: ${name}`,
-                fields: [{ name: "ids", label: "IDs", type: "textarea", rows: 10, default: ids.join(", ") }],
-                wide: true,
-            });
-            if (!values) return;
-            const result = await client.op("create_set", { set_kind: kind, name, ids: parseIdList(values.ids) });
-            if (!result.ok) toast.error(result.error);
-        }
+        listHost.appendChild(createSection);
 
         const nodeRows = Object.entries(store.mesh.node_sets).map(([name, ids]) =>
             setRow({
@@ -204,7 +203,7 @@ export function buildSetsPanel(root) {
                 // anything here - it reveals the set's members, highlighted.
                 showHide: false,
                 showEdit: true,
-                onEditMembers: () => editSimpleMembers("node", name, ids),
+                onEdit: () => editSet("node", name, ids),
             })
         );
         const elementRows = Object.entries(store.mesh.element_sets).map(([name, ids]) =>
@@ -216,7 +215,7 @@ export function buildSetsPanel(root) {
                 showIsolate: true,
                 showHide: true,
                 showEdit: true,
-                onEditMembers: () => editSimpleMembers("element", name, ids),
+                onEdit: () => editSet("element", name, ids),
             })
         );
         const surfaceRows = Object.entries(store.mesh.surface_sets).map(([name, tokens]) => {
@@ -235,28 +234,7 @@ export function buildSetsPanel(root) {
                     // separate hide toggle doesn't add anything.
                     showHide: false,
                     showEdit: true,
-                    onEditMembers: async () => {
-                        const values = await openDialog({
-                            title: `Edit Faces: ${name}`,
-                            fields: [
-                                { name: "faces", label: "element:face (0=S1)", type: "textarea", rows: 10, default: faceKeys.join(", ") },
-                            ],
-                            wide: true,
-                        });
-                        if (!values) return;
-                        const faces = values.faces
-                            .split(/[\s,]+/)
-                            .map(s => s.trim())
-                            .filter(Boolean)
-                            .map(token => token.split(":").map(Number))
-                            .filter(pair => pair.length === 2 && pair.every(Number.isInteger));
-                        if (!faces.length) {
-                            toast.error("No valid element:face pairs given.");
-                            return;
-                        }
-                        const result = await client.op("create_surface", { name, faces });
-                        if (!result.ok) toast.error(result.error);
-                    },
+                    onEdit: () => editSurfaceSet(name, faceKeys),
                 });
             }
             // Legacy import: a plain reference to element sets, no face geometry.
@@ -269,12 +247,13 @@ export function buildSetsPanel(root) {
                 showIsolate: true,
                 showHide: false,
                 showEdit: true,
+                onEdit: () => editLegacySurfaceSet(name),
             });
         });
 
-        root.appendChild(group("Node Sets", nodeRows));
-        root.appendChild(group("Element Sets", elementRows));
-        root.appendChild(group("Surface Sets", surfaceRows));
+        listHost.appendChild(group("Node Sets", nodeRows));
+        listHost.appendChild(group("Element Sets", elementRows));
+        listHost.appendChild(group("Surface Sets", surfaceRows));
     }
 
     bus.on("mesh:changed", render);

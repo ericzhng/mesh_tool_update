@@ -36,36 +36,43 @@ function hide() {
 function buildForNode(node) {
     if (!selection.nodeIds.has(node.id)) selection.setNodes([node.id]);
     return [
+        item("Refresh Mesh", () => run("file.refresh"), { icon: "refresh" }),
+        separator(),
         item("Delete Node", async () => {
             const result = await client.op("delete_nodes", { ids: [...selection.nodeIds] });
             if (!result.ok) toast.error(result.error);
         }),
-        separator(),
         item("Deselect", () => selection.clear()),
+        separator(),
+        item("Save Project", () => run("file.save"), { icon: "save" }),
     ];
 }
 
 function buildForElement(element) {
     if (!selection.elementIds.has(element.id)) selection.setElements([element.id]);
     return [
+        item("Refresh Mesh", () => run("file.refresh"), { icon: "refresh" }),
+        separator(),
         item("Delete Element", async () => {
             const result = await client.op("delete_elements", { ids: [...selection.elementIds] });
             if (!result.ok) toast.error(result.error);
         }),
-        separator(),
         item("Deselect", () => selection.clear()),
+        separator(),
+        item("Save Project", () => run("file.save"), { icon: "save" }),
     ];
 }
 
 function buildForEmptyCanvas() {
     return [
-        item("Add Node Here", () => run("tool.addNode")),
+        item("Refresh Mesh", () => run("file.refresh"), { icon: "refresh" }),
         separator(),
         item("Fit to View", () => run("view.fit"), { icon: "fit" }),
+        item("Select All", () => run("edit.selectAll")),
         item("Rotate CW", () => run("view.rotateCW"), { icon: "rotate-cw" }),
         item("Rotate CCW", () => run("view.rotateCCW"), { icon: "rotate-ccw" }),
         separator(),
-        item("Select All", () => run("edit.selectAll")),
+        item("Save Project", () => run("file.save"), { icon: "save" }),
     ];
 }
 

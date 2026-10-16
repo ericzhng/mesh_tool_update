@@ -19,10 +19,33 @@ export const selectTool = {
     id: "select",
     label: "Select",
     cursor: "default",
-    hint: "Click to select a node/edge/element · drag to move · box/Alt+drag to lasso · Shift adds · Ctrl toggles",
+
+    get hint() {
+        if (this.memberEdit) {
+            const { kind, mode } = this.memberEdit;
+            const verb = mode === "remove" ? "removes" : "adds";
+            return `Editing ${kind} set · click/box ${verb} · Shift adds · Ctrl removes · Esc cancels`;
+        }
+        return "Click to select a node/edge/element · drag to move · box/Alt+drag to lasso · Shift adds · Ctrl toggles";
+    },
+
+    // Set by the Sets panel's member editor to lock picking to one entity
+    // kind and turn plain clicks/boxes into explicit add/remove instead of
+    // replace - see `enterMemberEdit`/`exitMemberEdit` below.
+    memberEdit: null, // { kind: "node" | "element" | "surface", mode: "add" | "remove" } | null
 
     _drag: null, // { nodeIds, starts: Map(id -> {x,y}), pointerStart }
     _box: null, // { start, current, lasso: bool, points: [] }
+
+    enterMemberEdit(kind, mode = "add") {
+        this.memberEdit = { kind, mode };
+        hover.clear();
+    },
+
+    exitMemberEdit() {
+        this.memberEdit = null;
+        hover.clear();
+    },
 
     onDeactivate() {
         hover.clear();
@@ -31,6 +54,10 @@ export const selectTool = {
     },
 
     onPointerDown(e, world) {
+        if (this.memberEdit) {
+            this._handleMemberEditPointerDown(e, world);
+            return;
+        }
         const node = hitNode(world);
         if (node) {
             this._handleNodeHit(e, node, world);
@@ -48,6 +75,44 @@ export const selectTool = {
         }
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) selection.clear();
         this._box = { start: world, current: world, lasso: e.altKey, points: [world] };
+    },
+
+    // While a set is being edited, picking is locked to its kind and never
+    // replaces the current membership (a bare click would otherwise wipe
+    // out everything but the one id just clicked) - it only adds or
+    // removes, per the editor's current mode, with Shift/Ctrl as explicit
+    // overrides. Node dragging is skipped entirely, so a pick can never
+    // accidentally move a node while editing a set's membership.
+    _handleMemberEditPointerDown(e, world) {
+        const { kind } = this.memberEdit;
+        if (kind === "node") {
+            const node = hitNode(world);
+            if (node) {
+                this._applyPick(e, "nodes", [node.id]);
+                return;
+            }
+        } else if (kind === "element") {
+            const element = hitElement(world);
+            if (element) {
+                this._applyPick(e, "elements", [element.id]);
+                return;
+            }
+        } else if (kind === "surface") {
+            const edge = hitEdge(world);
+            if (edge) {
+                this._applyPick(e, "faces", [edge.key]);
+                return;
+            }
+        }
+        this._box = { start: world, current: world, lasso: e.altKey, points: [world] };
+    },
+
+    _applyPick(e, slot, ids) {
+        const action = e.ctrlKey || e.metaKey ? "remove" : e.shiftKey ? "add" : this.memberEdit.mode;
+        const adders = { nodes: selection.addNodes, elements: selection.addElements, faces: selection.addFaces };
+        const removers = { nodes: selection.removeNodes, elements: selection.removeElements, faces: selection.removeFaces };
+        const fn = action === "remove" ? removers[slot] : adders[slot];
+        fn.call(selection, ids);
     },
 
     _handleNodeHit(e, node, world) {
@@ -83,17 +148,21 @@ export const selectTool = {
 
     onPointerMove(e, world) {
         if (!this._drag && !this._box) {
-            const node = hitNode(world);
-            if (node) {
-                hover.setNode(node.id);
+            if (this.memberEdit) {
+                this._updateMemberEditHover(world);
             } else {
-                const edge = hitEdge(world);
-                if (edge) {
-                    hover.setFace(edge.key);
+                const node = hitNode(world);
+                if (node) {
+                    hover.setNode(node.id);
                 } else {
-                    const element = hitElement(world);
-                    if (element) hover.setElement(element.id);
-                    else hover.clear();
+                    const edge = hitEdge(world);
+                    if (edge) {
+                        hover.setFace(edge.key);
+                    } else {
+                        const element = hitElement(world);
+                        if (element) hover.setElement(element.id);
+                        else hover.clear();
+                    }
                 }
             }
         }
@@ -123,6 +192,23 @@ export const selectTool = {
         }
     },
 
+    _updateMemberEditHover(world) {
+        const { kind } = this.memberEdit;
+        if (kind === "node") {
+            const node = hitNode(world);
+            if (node) hover.setNode(node.id);
+            else hover.clear();
+        } else if (kind === "element") {
+            const element = hitElement(world);
+            if (element) hover.setElement(element.id);
+            else hover.clear();
+        } else {
+            const edge = hitEdge(world);
+            if (edge) hover.setFace(edge.key);
+            else hover.clear();
+        }
+    },
+
     onPointerUp(e, world) {
         if (this._drag) {
             const nodes = [...this._drag.starts.keys()].map(id => {
@@ -146,25 +232,46 @@ export const selectTool = {
 
         const within = point => (box.lasso ? pointInPolygon(point, box.points) : inBox(point, box));
 
-        const nodeHits = store.mesh.nodes.filter(n => store.isNodeVisible(n.id) && within(n));
-        const nodeIds = nodeHits.map(n => n.id);
+        const nodeIds = this.memberEdit && this.memberEdit.kind !== "node"
+            ? []
+            : store.mesh.nodes.filter(n => store.isNodeVisible(n.id) && within(n)).map(n => n.id);
 
-        const elementHits = store.mesh.elements.filter(el => {
-            if (!store.isElementVisible(el.id)) return false;
-            return el.node_ids.every(id => {
-                const n = store.node(id);
-                return n && within(n);
-            });
-        });
-        const elementIds = elementHits.map(el => el.id);
+        const elementIds = this.memberEdit && this.memberEdit.kind !== "element"
+            ? []
+            : store.mesh.elements
+                  .filter(el => {
+                      if (!store.isElementVisible(el.id)) return false;
+                      return el.node_ids.every(id => {
+                          const n = store.node(id);
+                          return n && within(n);
+                      });
+                  })
+                  .map(el => el.id);
 
-        const edgeHits = store.edgeFaces.filter(edge => {
-            if (!store.isEdgeVisible(edge)) return false;
-            const a = store.node(edge.a);
-            const b = store.node(edge.b);
-            return a && b && within(a) && within(b);
-        });
-        const faceKeys = edgeHits.map(edge => edge.key);
+        const faceKeys = this.memberEdit && this.memberEdit.kind !== "surface"
+            ? []
+            : store.edgeFaces
+                  .filter(edge => {
+                      if (!store.isEdgeVisible(edge)) return false;
+                      const a = store.node(edge.a);
+                      const b = store.node(edge.b);
+                      return a && b && within(a) && within(b);
+                  })
+                  .map(edge => edge.key);
+
+        if (this.memberEdit) {
+            const action = e.ctrlKey || e.metaKey ? "remove" : e.shiftKey ? "add" : this.memberEdit.mode;
+            if (action === "remove") {
+                selection.removeNodes(nodeIds);
+                selection.removeElements(elementIds);
+                selection.removeFaces(faceKeys);
+            } else {
+                selection.addNodes(nodeIds);
+                selection.addElements(elementIds);
+                selection.addFaces(faceKeys);
+            }
+            return;
+        }
 
         if (e.ctrlKey || e.metaKey) {
             toggleHits(selection.nodeIds, nodeIds, selection.addNodes.bind(selection), selection.removeNodes.bind(selection));
@@ -185,7 +292,10 @@ export const selectTool = {
     },
 
     onKeyDown(e) {
-        if (e.key === "Escape") {
+        // While editing a set's membership, Escape is the editor's own
+        // "cancel" (it restores the pre-edit selection itself) rather than
+        // this tool's normal "clear the whole selection".
+        if (e.key === "Escape" && !this.memberEdit) {
             this._drag = null;
             this._box = null;
             selection.clear();

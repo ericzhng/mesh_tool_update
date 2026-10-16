@@ -128,6 +128,33 @@ class TestSets(unittest.TestCase):
         with self.assertRaises(ValueError):
             ops.rename_set(mesh, "node", "a", "b")
 
+    def test_update_set_renames_and_replaces_members_together(self):
+        mesh = square_mesh()
+        ops.create_set(mesh, "node", "left", [1, 4])
+        ops.update_set(mesh, "node", "left", "renamed", ids=[2, 3])
+        self.assertNotIn("left", mesh.node_sets)
+        self.assertEqual(mesh.node_sets["renamed"], [2, 3])
+
+    def test_update_set_same_name_just_replaces_members(self):
+        mesh = square_mesh()
+        ops.create_set(mesh, "node", "left", [1, 4])
+        ops.update_set(mesh, "node", "left", "left", ids=[2])
+        self.assertEqual(mesh.node_sets["left"], [2])
+
+    def test_update_set_name_collision_leaves_set_untouched(self):
+        mesh = square_mesh()
+        ops.create_set(mesh, "node", "a", [1])
+        ops.create_set(mesh, "node", "b", [2])
+        with self.assertRaises(ValueError):
+            ops.update_set(mesh, "node", "a", "b", ids=[3])
+        self.assertEqual(mesh.node_sets["a"], [1])
+        self.assertEqual(mesh.node_sets["b"], [2])
+
+    def test_update_set_missing_name_raises(self):
+        mesh = square_mesh()
+        with self.assertRaises(ValueError):
+            ops.update_set(mesh, "node", "missing", "renamed", ids=[1])
+
 
 class TestSurfaceSets(unittest.TestCase):
     def test_create_surface_stores_direct_element_face_tokens(self):
@@ -169,6 +196,20 @@ class TestSurfaceSets(unittest.TestCase):
         mesh = square_mesh()
         with self.assertRaises(ValueError):
             ops.create_set(mesh, "surface", "surf1", [1])
+
+    def test_update_set_renames_and_replaces_faces_together(self):
+        mesh = square_mesh()
+        ops.create_surface(mesh, "surf1", [[1, 0], [2, 1]])
+        ops.update_set(mesh, "surface", "surf1", "renamed", faces=[[1, 0]])
+        self.assertNotIn("surf1", mesh.surface_sets)
+        self.assertEqual(mesh.surface_sets["renamed"], ["1", "S1"])
+
+    def test_update_set_surface_rejects_unknown_element(self):
+        mesh = square_mesh()
+        ops.create_surface(mesh, "surf1", [[1, 0]])
+        with self.assertRaises(ValueError):
+            ops.update_set(mesh, "surface", "surf1", "surf1", faces=[[99, 0]])
+        self.assertEqual(mesh.surface_sets["surf1"], ["1", "S1"])
 
 
 class TestMergeAndRenumber(unittest.TestCase):

@@ -35,6 +35,15 @@ export const EntityState = Object.freeze({
     // flags elements whose skewness/aspect-ratio crosses the warn/bad limit.
     QUALITY_WARN: "quality-warn",
     QUALITY_BAD: "quality-bad",
+    // Ids called out by the Sets panel's set editor (its id-list caret/
+    // selection) - violet/purple, distinct from both the red "selected"
+    // state and the orange hover/isolate state. For elements/edges this
+    // colors the outline as usual; for nodes it's drawn as a ring around
+    // the dot instead (see drawNodes in renderer.js) rather than a fill
+    // swap, since a highlighted id is very often also selected and the
+    // ring needs to stand out from the rest of the selection regardless
+    // of whatever color the dot underneath already is.
+    HIGHLIGHT: "highlight",
 });
 
 export function cssVar(name) {
@@ -58,6 +67,8 @@ export function nodeStyle(state) {
 
 export function elementStyle(state) {
     switch (state) {
+        case EntityState.HIGHLIGHT:
+            return { fill: cssVar("--id-highlight-fill"), stroke: cssVar("--id-highlight"), width: 2.5 };
         case EntityState.SELECTED:
             return { fill: cssVar("--element-selected-fill"), stroke: cssVar("--node-selected"), width: 2.5 };
         case EntityState.HOVER:
@@ -73,6 +84,8 @@ export function elementStyle(state) {
 
 export function edgeFaceStyle(state) {
     switch (state) {
+        case EntityState.HIGHLIGHT:
+            return { stroke: cssVar("--id-highlight"), width: 3.5, dashed: false, alpha: 1 };
         case EntityState.SELECTED:
             return { stroke: cssVar("--node-selected"), width: 3.5, dashed: false, alpha: 1 };
         case EntityState.HOVER:

@@ -490,10 +490,10 @@ button {
     margin: 0 0 var(--space-3);
     font-size: var(--font-size-lg);
 }
-.dialog .field-row-textarea {
+.field-row-textarea {
     align-items: flex-start;
 }
-.dialog .field-row-textarea textarea {
+.field-row-textarea textarea {
     flex: 1;
     min-width: 0;
     padding: 7px 9px;
@@ -505,13 +505,85 @@ button {
     font-size: var(--font-size-sm);
     resize: vertical;
 }
-.dialog .field-row-textarea textarea:focus {
+.field-row-textarea textarea:focus {
     outline: 2px solid var(--accent);
     outline-offset: -1px;
 }
 .dialog .btn-row {
     justify-content: flex-end;
     margin-top: var(--space-4);
+}
+
+/* ---------- Set editor (inline, docked - see ui/panels/set-editor.js) ---------- */
+.set-editor {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface-alt);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+.set-editor-header {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-2);
+}
+.pick-mode-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+.pick-mode-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+.pick-mode-toggle button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    padding: 5px 10px;
+    font-size: var(--font-size-sm);
+}
+.pick-mode-toggle button + button {
+    border-left: 1px solid var(--border-color);
+}
+.pick-mode-toggle button.active {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+.pick-mode-hint {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    flex-basis: 100%;
+}
+.set-editor-count {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-1);
+}
+.set-editor-warning {
+    font-size: var(--font-size-xs);
+    color: var(--warning);
+    margin-bottom: var(--space-2);
+    min-height: 1em;
+}
+.set-editor-actions {
+    flex-wrap: wrap;
+    margin-top: var(--space-3);
+}
+.set-editor-actions .btn-row-spacer {
+    flex-basis: 100%;
+    height: 0;
+}
+.sets-list-busy {
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 /* ---------- Edit-mode badge ---------- */

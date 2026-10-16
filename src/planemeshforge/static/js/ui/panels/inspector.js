@@ -119,12 +119,24 @@ function renderMultiSelection(root) {
     const faceKeys = [...selection.faceKeys];
     const info = section("Selection");
 
-    const count = document.createElement("div");
-    count.className = "empty-hint";
-    count.textContent =
-        `${nodeIds.length} node(s), ${elementIds.length} element(s)` +
-        `${faceKeys.length ? `, ${faceKeys.length} edge(s)` : ""} selected`;
-    info.appendChild(count);
+    if (nodeIds.length) {
+        const row = document.createElement("div");
+        row.className = "empty-hint";
+        row.textContent = `${nodeIds.length} node(s) selected`;
+        info.appendChild(row);
+    }
+    if (elementIds.length) {
+        const row = document.createElement("div");
+        row.className = "empty-hint";
+        row.textContent = `${elementIds.length} element(s) selected`;
+        info.appendChild(row);
+    }
+    if (faceKeys.length) {
+        const row = document.createElement("div");
+        row.className = "empty-hint";
+        row.textContent = `${faceKeys.length} edge(s) selected`;
+        info.appendChild(row);
+    }
 
     // Widen the bbox beyond just directly-selected nodes to every node
     // referenced by a selected element/edge too, so a combined box-select

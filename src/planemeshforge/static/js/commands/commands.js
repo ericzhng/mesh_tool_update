@@ -23,6 +23,15 @@ export function registerCommands() {
     define({ id: "file.import", label: "Import Mesh (.inp/.deck)…", icon: "import", run: () => document.getElementById("mesh-file-input").click() });
     define({ id: "file.export", label: "Export Deck…", icon: "export", run: () => project.exportDeck() });
     define({
+        id: "file.refresh",
+        label: "Refresh Mesh",
+        icon: "refresh",
+        run: () => {
+            client.getMesh();
+            toast.success("Mesh refreshed from server.");
+        },
+    });
+    define({
         id: "file.clear",
         label: "Clear Mesh",
         icon: "trash",

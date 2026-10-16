@@ -96,6 +96,7 @@ async function main() {
     bus.on("selection:changed", scheduleDraw);
     bus.on("visibility:changed", scheduleDraw);
     bus.on("quality:changed", scheduleDraw);
+    bus.on("highlight:changed", scheduleDraw);
 
     bus.on("connection:changed", ({ connected }) => {
         if (!connected) toast.error("Disconnected from server. Reconnecting…");

@@ -41,6 +41,10 @@ class ToolManager {
 
         window.addEventListener("keydown", e => {
             if (e.code === "Space") this._spaceHeld = true;
+            // Esc/Delete etc. are tool actions (e.g. clear the selection) -
+            // don't fire them while the user is typing in a form field.
+            const tag = e.target?.tagName;
+            if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
             this.active?.onKeyDown?.(e);
         });
         window.addEventListener("keyup", e => {

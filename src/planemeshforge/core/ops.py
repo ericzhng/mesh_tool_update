@@ -221,16 +221,7 @@ def create_set(mesh: Mesh, set_kind: str, name: str, ids: list[int]) -> dict:
     return {}
 
 
-def create_surface(mesh: Mesh, name: str, faces: list[list[int]]) -> dict:
-    """Creates (or overwrites) a surface set from `(element_id, face_index)` pairs.
-
-    `face_index` is 0-based (edge between `node_ids[i]` and the next node),
-    matching Abaqus face labels `S1`, `S2`, ... (`face_index + 1`). Abaqus
-    lets a `*SURFACE, TYPE=ELEMENT` line reference an element id directly
-    (no backing `*ELSET` needed), so each face becomes its own
-    `elementId, Sn` token pair.
-    """
-    mesh = _require_mesh(mesh)
+def _surface_tokens_from_faces(mesh: Mesh, faces: list[list[int]]) -> list[str]:
     if not faces:
         raise ValueError("No faces given to create a surface from.")
 
@@ -251,8 +242,20 @@ def create_surface(mesh: Mesh, name: str, faces: list[list[int]]) -> dict:
     tokens: list[str] = []
     for element_id, label in sorted(set(pairs)):
         tokens.extend([str(element_id), label])
+    return tokens
 
-    mesh.surface_sets[name] = tokens
+
+def create_surface(mesh: Mesh, name: str, faces: list[list[int]]) -> dict:
+    """Creates (or overwrites) a surface set from `(element_id, face_index)` pairs.
+
+    `face_index` is 0-based (edge between `node_ids[i]` and the next node),
+    matching Abaqus face labels `S1`, `S2`, ... (`face_index + 1`). Abaqus
+    lets a `*SURFACE, TYPE=ELEMENT` line reference an element id directly
+    (no backing `*ELSET` needed), so each face becomes its own
+    `elementId, Sn` token pair.
+    """
+    mesh = _require_mesh(mesh)
+    mesh.surface_sets[name] = _surface_tokens_from_faces(mesh, faces)
     return {}
 
 
@@ -272,6 +275,39 @@ def rename_set(mesh: Mesh, set_kind: str, name: str, new_name: str) -> dict:
     if new_name in sets:
         raise ValueError(f"A set named '{new_name}' already exists.")
     sets[new_name] = sets.pop(name)
+    return {}
+
+
+def update_set(
+    mesh: Mesh,
+    set_kind: str,
+    name: str,
+    new_name: str,
+    ids: list[int] | None = None,
+    faces: list[list[int]] | None = None,
+) -> dict:
+    """Renames a set and replaces its membership in one atomic step.
+
+    Combines what the client used to do as separate `rename_set` +
+    `create_set`/`create_surface` calls (two undo steps, and a rename that
+    could succeed while the membership update failed). Validates the rename
+    before touching anything, same as `rename_set`.
+    """
+    mesh = _require_mesh(mesh)
+    sets = _set_dict(mesh, set_kind)
+    if name not in sets:
+        raise ValueError(f"Set '{name}' does not exist.")
+    if new_name != name and new_name in sets:
+        raise ValueError(f"A set named '{new_name}' already exists.")
+
+    if set_kind == "surface":
+        tokens = _surface_tokens_from_faces(mesh, faces or [])
+    else:
+        tokens = sorted(set(ids or []))
+
+    if new_name != name:
+        sets.pop(name)
+    sets[new_name] = tokens
     return {}
 
 
@@ -316,6 +352,7 @@ OPS = {
     "create_surface": create_surface,
     "delete_set": delete_set,
     "rename_set": rename_set,
+    "update_set": update_set,
     "set_add_members": set_add_members,
     "set_remove_members": set_remove_members,
 }

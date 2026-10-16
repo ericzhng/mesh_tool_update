@@ -4,6 +4,7 @@
 // mutates store/selection - it only reads them.
 import { store } from "../core/store.js";
 import { selection } from "../core/selection.js";
+import { highlight } from "../core/highlight.js";
 import { hover } from "../core/hover.js";
 import { qualityOverlay, QualityLevel } from "../core/quality-overlay.js";
 import { viewport } from "./viewport.js";
@@ -100,10 +101,16 @@ function drawElements(ctx) {
     ctx.save();
     let hovered = null;
     const selected = [];
+    const highlighted = [];
     for (const element of store.mesh.elements) {
         if (!store.isElementVisible(element.id)) continue;
-        const isSelected = selection.elementIds.has(element.id);
-        const isHovered = !isSelected && hover.elementId === element.id;
+        const isHighlighted = highlight.elementIds.has(element.id);
+        const isSelected = !isHighlighted && selection.elementIds.has(element.id);
+        const isHovered = !isHighlighted && !isSelected && hover.elementId === element.id;
+        if (isHighlighted) {
+            highlighted.push(element);
+            continue;
+        }
         if (isSelected) {
             selected.push(element);
             continue;
@@ -120,6 +127,7 @@ function drawElements(ctx) {
     }
     if (hovered) drawElement(ctx, hovered, EntityState.HOVER);
     for (const element of selected) drawElement(ctx, element, EntityState.SELECTED);
+    for (const element of highlighted) drawElement(ctx, element, EntityState.HIGHLIGHT);
     ctx.restore();
 }
 
@@ -160,20 +168,25 @@ function drawEdgeFaces(ctx) {
     // for every other surface edge, Abaqus-style thin dark edges.
     for (const edge of store.edgeFaces) {
         if (!store.isElementVisible(edge.elementId)) continue;
-        if (selection.faceKeys.has(edge.key) || hover.faceKey === edge.key) continue;
+        if (highlight.faceKeys.has(edge.key) || selection.faceKeys.has(edge.key) || hover.faceKey === edge.key) continue;
         if (store.isEdgeGhosted(edge)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.GHOST));
         else if (store.isEdgeIsolated(edge)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.ISOLATED));
     }
     // Gate on the element alone (not the stricter isEdgeVisible) so a
     // selected edge keeps showing even if its surface set gets hidden
     // afterwards - selection should never just silently vanish.
-    if (hover.faceKey && !selection.faceKeys.has(hover.faceKey)) {
+    if (hover.faceKey && !selection.faceKeys.has(hover.faceKey) && !highlight.faceKeys.has(hover.faceKey)) {
         const edge = store.edgeFaceMap.get(hover.faceKey);
         if (edge && store.isElementVisible(edge.elementId)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.HOVER));
     }
     for (const key of selection.faceKeys) {
+        if (highlight.faceKeys.has(key)) continue;
         const edge = store.edgeFaceMap.get(key);
         if (edge && store.isElementVisible(edge.elementId)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.SELECTED));
+    }
+    for (const key of highlight.faceKeys) {
+        const edge = store.edgeFaceMap.get(key);
+        if (edge && store.isElementVisible(edge.elementId)) drawEdge(ctx, edge, edgeFaceStyle(EntityState.HIGHLIGHT));
     }
     ctx.restore();
 }
@@ -192,7 +205,7 @@ function isNodeRevealed(nodeId, isolatedNodeIds) {
     // "Show Node Labels" is also the user's way of asking to see every node
     // - toggling it on reveals the whole mesh's nodes, not just the labels.
     if (viewport.showNodeLabels) return true;
-    if (selection.nodeIds.has(nodeId) || hover.nodeId === nodeId) return true;
+    if (highlight.nodeIds.has(nodeId) || selection.nodeIds.has(nodeId) || hover.nodeId === nodeId) return true;
     if (isolatedNodeIds?.has(nodeId)) return true;
     if (!store.elementsByNode.has(nodeId)) return true;
     return false;
@@ -203,6 +216,10 @@ function drawNodes(ctx) {
     const radius = Math.max(2.5, Math.min(6, viewport.scale * 0.12));
     const isolatedNodeIds =
         store.isolatedSet?.kind === "node" ? new Set(store.mesh.node_sets[store.isolatedSet.name] || []) : null;
+    // Highlight rings are collected and drawn in a second pass, on top of
+    // every node fill, so a ring is never visually clipped by a neighboring
+    // node drawn after it.
+    const rings = [];
     for (const node of store.mesh.nodes) {
         if (!store.isNodeVisible(node.id)) continue;
         if (!isNodeRevealed(node.id, isolatedNodeIds)) continue;
@@ -221,17 +238,34 @@ function drawNodes(ctx) {
                   ? EntityState.LABELED
                   : EntityState.DEFAULT;
         const style = nodeStyle(state);
+        const r = radius + style.radiusDelta;
 
         ctx.beginPath();
-        ctx.arc(p.x, p.y, radius + style.radiusDelta, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.fillStyle = style.color;
         ctx.fill();
+
+        // A ring around the node, independent of its fill color, so a
+        // highlighted id reads clearly no matter what state (default,
+        // selected, hovered) its dot is already drawn in - a color swap
+        // alone can get lost against the mesh's own palette (e.g. the
+        // green element fill), but a ring never does.
+        if (highlight.nodeIds.has(node.id)) rings.push({ p, r });
 
         if (viewport.showNodeLabels && viewport.scale >= LABEL_SCALE_THRESHOLD) {
             ctx.fillStyle = cssVar("--text-primary");
             ctx.font = "11px var(--font-mono)";
             ctx.textAlign = "left";
             ctx.fillText(`${node.id}`, p.x + radius + 3, p.y - radius);
+        }
+    }
+    if (rings.length) {
+        ctx.strokeStyle = cssVar("--id-highlight");
+        ctx.lineWidth = 2;
+        for (const { p, r } of rings) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
+            ctx.stroke();
         }
     }
     ctx.restore();
