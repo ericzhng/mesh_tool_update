@@ -15,6 +15,11 @@ class Viewport {
         this.snapToNode = false;
         this.showNodeLabels = false;
         this.showElementLabels = false;
+        // 1D elements (e.g. SFMGAX1) render as a plain line, the same
+        // style as a 2D element's border - easy to mistake for a real edge.
+        // On by default (matches prior behavior, where there was no way to
+        // hide them at all); turn off when they're cluttering the view.
+        this.showLineElements = true;
         // Set by tool-manager when the active tool needs every node visible
         // for picking (e.g. element-creation tools), overriding the normal
         // Abaqus-style "nodes hidden until hovered" behavior.

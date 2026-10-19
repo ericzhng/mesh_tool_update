@@ -565,6 +565,22 @@ export function buildUtilitiesPanel(root) {
         }
     });
 
+    // ---- Display ----
+    // 1D elements (e.g. SFMGAX1) render as a plain line - the same style
+    // used for a 2D element's border - so they're easy to mistake for a
+    // real edge. This just toggles whether they're drawn at all.
+    const display = section("Display");
+    display.innerHTML += `
+        <div class="checkbox-row"><input type="checkbox" id="show-line-elements"><label for="show-line-elements">Show 1D elements</label></div>
+    `;
+    root.appendChild(display);
+    const lineElementsCheckbox = display.querySelector("#show-line-elements");
+    lineElementsCheckbox.checked = viewport.showLineElements;
+    lineElementsCheckbox.addEventListener("change", () => {
+        viewport.showLineElements = lineElementsCheckbox.checked;
+        scheduleDraw();
+    });
+
     // ---- Snap & Grid ----
     const snap = section("Snap & Grid");
     snap.innerHTML += `

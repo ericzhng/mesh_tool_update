@@ -104,6 +104,10 @@ function drawElements(ctx) {
     const highlighted = [];
     for (const element of store.mesh.elements) {
         if (!store.isElementVisible(element.id)) continue;
+        // 1D elements (2 nodes, e.g. SFMGAX1) have no face/area - same
+        // check `store.js`'s edge-face indexing uses to tell them apart
+        // from real 2D elements.
+        if (element.node_ids.length < 3 && !viewport.showLineElements) continue;
         const isHighlighted = highlight.elementIds.has(element.id);
         const isSelected = !isHighlighted && selection.elementIds.has(element.id);
         const isHovered = !isHighlighted && !isSelected && hover.elementId === element.id;
