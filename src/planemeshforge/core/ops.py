@@ -13,6 +13,8 @@ import numpy as np
 from ..abaqus_io import Mesh, ElementBlock
 from . import transform as tf
 from . import topology as topo
+from .improve.pipeline import improve_quality
+from .improve.smoothing import smooth_nodes
 
 
 def _require_mesh(mesh: Mesh | None) -> Mesh:
@@ -348,6 +350,8 @@ OPS = {
     "renumber": renumber,
     "split_quads": split_quads,
     "triangulate": triangulate,
+    "smooth_nodes": smooth_nodes,
+    "improve_quality": improve_quality,
     "create_set": create_set,
     "create_surface": create_surface,
     "delete_set": delete_set,

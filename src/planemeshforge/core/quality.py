@@ -11,7 +11,46 @@ _2D_TYPES = {"CGAX3", "CGAX4"}
 
 # Equiangle-skew reference angle (degrees) for each 2D element type: the
 # interior angle of the "ideal" (equilateral triangle / square) shape.
-_IDEAL_ANGLE = {"CGAX3": 60.0, "CGAX4": 90.0}
+# Public so `core.improve` can score candidate node positions the same way.
+IDEAL_ANGLE = {"CGAX3": 60.0, "CGAX4": 90.0}
+_IDEAL_ANGLE = IDEAL_ANGLE
+
+
+def element_shape_metrics(pts: np.ndarray, ideal_angle: float) -> dict:
+    """Shape metrics for one 2D element, given its ordered `(n_nodes, 2)` points.
+
+    Same definitions as `metrics()` below (`aspect_ratio`, `min_angle`,
+    `max_angle`, `skewness`), computed for a single element rather than a
+    whole block. Used by `core.improve` to score a candidate node position
+    before committing to it.
+    """
+    next_pts = np.roll(pts, -1, axis=0)
+    prev_pts = np.roll(pts, 1, axis=0)
+
+    edge_lens = np.linalg.norm(next_pts - pts, axis=1)
+    min_edge, max_edge = float(edge_lens.min()), float(edge_lens.max())
+    degenerate = min_edge <= 1e-12
+    aspect_ratio = None if degenerate else max_edge / min_edge
+
+    v1, v2 = prev_pts - pts, next_pts - pts
+    dot = np.sum(v1 * v2, axis=1)
+    norms = np.linalg.norm(v1, axis=1) * np.linalg.norm(v2, axis=1)
+    cos_angle = np.clip(np.divide(dot, norms, out=np.zeros_like(dot), where=norms > 1e-12), -1.0, 1.0)
+    angles = np.degrees(np.arccos(cos_angle))
+    min_angle, max_angle = float(angles.min()), float(angles.max())
+
+    if degenerate:
+        skewness = 1.0
+    else:
+        skewness = max((max_angle - ideal_angle) / (180.0 - ideal_angle), (ideal_angle - min_angle) / ideal_angle)
+        skewness = float(np.clip(skewness, 0.0, 1.0))
+
+    return {
+        "aspect_ratio": aspect_ratio,
+        "min_angle": min_angle,
+        "max_angle": max_angle,
+        "skewness": skewness,
+    }
 
 
 def check(mesh: Mesh) -> list[dict]:
