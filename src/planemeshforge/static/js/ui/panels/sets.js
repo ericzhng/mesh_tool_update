@@ -186,24 +186,22 @@ export function buildSetsPanel(root) {
         // While the editor is open there's nothing useful "Create X Set"
         // could do (its own selection-driven Add/Remove already covers
         // that), so it's skipped entirely rather than shown greyed out.
-        if (!isSetEditorOpen()) {
+        // With nothing selected there's nothing to create either, so the
+        // whole section - buttons or hint - just doesn't appear.
+        const present = CREATE_KINDS.filter(k => k.count() > 0);
+        if (!isSetEditorOpen() && present.length) {
             const createSection = document.createElement("div");
             createSection.className = "panel-section";
-            const present = CREATE_KINDS.filter(k => k.count() > 0);
-            if (!present.length) {
-                createSection.innerHTML = `<div class="empty-hint">Select some nodes, elements, or surface edges first.</div>`;
-            } else {
-                const row = document.createElement("div");
-                row.className = "btn-row";
-                present.forEach(({ kind, label, iconName, count }) => {
-                    const btn = document.createElement("button");
-                    btn.className = "btn btn-primary";
-                    btn.innerHTML = `${icon(iconName)}Create ${label} Set (${count()})`;
-                    btn.addEventListener("click", () => createSetFromSelection(kind));
-                    row.appendChild(btn);
-                });
-                createSection.appendChild(row);
-            }
+            const row = document.createElement("div");
+            row.className = "btn-row";
+            present.forEach(({ kind, label, iconName, count }) => {
+                const btn = document.createElement("button");
+                btn.className = "btn btn-primary";
+                btn.innerHTML = `${icon(iconName)}Create ${label} Set (${count()})`;
+                btn.addEventListener("click", () => createSetFromSelection(kind));
+                row.appendChild(btn);
+            });
+            createSection.appendChild(row);
             listHost.appendChild(createSection);
         }
 

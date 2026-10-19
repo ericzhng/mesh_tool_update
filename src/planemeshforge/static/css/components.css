@@ -462,6 +462,22 @@ button {
 }
 .metrics-flagged-values .over { color: var(--danger); font-weight: 600; }
 
+/* ---------- Flagged-elements progressive reveal (see utilities.js) ---------- */
+.flagged-reveal-row {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-1) 6px;
+}
+.btn-link {
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    padding: 0;
+}
+.btn-link:hover { text-decoration: underline; }
+
 /* ---------- Context menu ---------- */
 #context-menu {
     position: fixed;

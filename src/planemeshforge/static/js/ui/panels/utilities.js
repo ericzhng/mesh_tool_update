@@ -11,7 +11,13 @@ import { openDialog } from "../dialogs.js";
 import { toast } from "../toast.js";
 import { icon } from "../icons.js";
 
-const MAX_FLAGGED_ROWS = 50;
+// Flagged elements are grouped by severity (Bad/Warn), each a collapsible
+// disclosure like the Sets panel's groups, with only the first REVEAL_STEP
+// rows of each shown at a time - "Show N more"/"Show all" progressively
+// reveals the rest, the same truncate-then-expand pattern long result
+// lists use elsewhere (log viewers, workspace/variable browsers, etc.) so
+// a mesh with hundreds of bad elements doesn't turn into one giant list.
+const REVEAL_STEP = 10;
 
 function fmt(n) {
     return n == null ? "–" : n.toFixed(3);
@@ -35,6 +41,14 @@ export function buildUtilitiesPanel(root) {
     const panel = document.createElement("div");
     panel.className = "utilities-panel";
     root.appendChild(panel);
+
+    // How many of each severity group's flagged elements are currently
+    // revealed, and whether each group is expanded - both survive
+    // `renderMetrics()` re-renders (e.g. toggling Highlight) the same way
+    // the Sets panel's `openGroups` survives its own re-renders; a fresh
+    // "Compute Metrics" resets them back to the collapsed default.
+    const flaggedOpen = { [QualityLevel.BAD]: true, [QualityLevel.WARN]: true };
+    const flaggedRevealed = { [QualityLevel.BAD]: REVEAL_STEP, [QualityLevel.WARN]: REVEAL_STEP };
     root = panel;
 
     // Ordered by how often each is reached for: shaping the selection
@@ -313,8 +327,27 @@ export function buildUtilitiesPanel(root) {
             resultsEl.innerHTML = `<div class="empty-hint">No skewed elements found.</div>`;
             return;
         }
-        for (const elem of flagged.slice(0, MAX_FLAGGED_ROWS)) {
-            const level = qualityOverlay.levels.get(elem.id);
+
+        // Order matches severity: worst group first. Each is its own
+        // collapsible section (sorted-by-severity filter preserves order),
+        // so "Bad" and "Warn" can be expanded/collapsed independently.
+        renderFlaggedGroup(resultsEl, QualityLevel.BAD, "Bad", flagged.filter(e => qualityOverlay.levels.get(e.id) === QualityLevel.BAD), limits);
+        renderFlaggedGroup(resultsEl, QualityLevel.WARN, "Warn", flagged.filter(e => qualityOverlay.levels.get(e.id) === QualityLevel.WARN), limits);
+    }
+
+    function renderFlaggedGroup(container, level, label, elements, limits) {
+        if (!elements.length) return;
+
+        const details = document.createElement("details");
+        details.className = "set-group";
+        details.open = flaggedOpen[level];
+        details.innerHTML = `<summary>${label} (${elements.length})</summary>`;
+        details.addEventListener("toggle", () => {
+            flaggedOpen[level] = details.open;
+        });
+
+        const shownCount = Math.min(flaggedRevealed[level], elements.length);
+        for (const elem of elements.slice(0, shownCount)) {
             const skewOver = elem.skewness >= limits.skewnessWarn;
             const aspectOver = elem.aspect_ratio != null && elem.aspect_ratio >= limits.aspectRatioWarn;
             const row = document.createElement("div");
@@ -330,14 +363,54 @@ export function buildUtilitiesPanel(root) {
                 selection.setElements([elem.id]);
                 scheduleDraw();
             });
-            resultsEl.appendChild(row);
+            details.appendChild(row);
         }
-        if (flagged.length > MAX_FLAGGED_ROWS) {
-            const more = document.createElement("div");
-            more.className = "empty-hint";
-            more.textContent = `+${flagged.length - MAX_FLAGGED_ROWS} more`;
-            resultsEl.appendChild(more);
+
+        const remaining = elements.length - shownCount;
+        if (remaining > 0) {
+            const revealRow = document.createElement("div");
+            revealRow.className = "flagged-reveal-row";
+
+            const moreBtn = document.createElement("button");
+            moreBtn.className = "btn-link";
+            moreBtn.textContent = `Show ${Math.min(REVEAL_STEP, remaining)} more`;
+            moreBtn.addEventListener("click", () => {
+                flaggedRevealed[level] = shownCount + REVEAL_STEP;
+                renderMetrics();
+            });
+            revealRow.appendChild(moreBtn);
+
+            if (remaining > REVEAL_STEP) {
+                const allBtn = document.createElement("button");
+                allBtn.className = "btn-link";
+                allBtn.textContent = `Show all (${elements.length})`;
+                allBtn.addEventListener("click", () => {
+                    flaggedRevealed[level] = elements.length;
+                    renderMetrics();
+                });
+                revealRow.appendChild(allBtn);
+            }
+            details.appendChild(revealRow);
+        } else if (shownCount > REVEAL_STEP) {
+            const revealRow = document.createElement("div");
+            revealRow.className = "flagged-reveal-row";
+            const lessBtn = document.createElement("button");
+            lessBtn.className = "btn-link";
+            lessBtn.textContent = "Show less";
+            lessBtn.addEventListener("click", () => {
+                flaggedRevealed[level] = REVEAL_STEP;
+                renderMetrics();
+            });
+            revealRow.appendChild(lessBtn);
+            details.appendChild(revealRow);
         }
+
+        container.appendChild(details);
+    }
+
+    function resetFlaggedReveal() {
+        flaggedRevealed[QualityLevel.BAD] = REVEAL_STEP;
+        flaggedRevealed[QualityLevel.WARN] = REVEAL_STEP;
     }
 
     metrics.querySelector("#metrics-compute").addEventListener("click", async () => {
@@ -347,12 +420,14 @@ export function buildUtilitiesPanel(root) {
             toast.error(result.error);
             return;
         }
+        resetFlaggedReveal();
         renderMetrics();
     });
 
     for (const id of ["#m-skew-warn", "#m-skew-bad", "#m-aspect-warn", "#m-aspect-bad"]) {
         metrics.querySelector(id).addEventListener("change", () => {
             qualityOverlay.setLimits(currentLimits());
+            resetFlaggedReveal();
             renderMetrics();
         });
     }
