@@ -184,12 +184,32 @@ button {
 
 /* ---------- Dock (right panel) ---------- */
 #dock {
-    width: 300px;
+    width: var(--dock-width, 300px);
     background: var(--bg-surface);
     border-left: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
     min-width: 0;
+    position: relative;
+}
+
+/* A thin strip straddling the dock's left border - `installDockResize`
+   (ui/dock-resize.js) drags it to resize the dock, clamped to a sane
+   width range and persisted across reloads. */
+#dock-resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 5;
+    background: transparent;
+}
+#dock-resize-handle:hover,
+#dock-resize-handle.dragging {
+    background: var(--accent);
+    opacity: 0.5;
 }
 
 .dock-tabs {
@@ -217,6 +237,11 @@ button {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    /* Reserve the scrollbar's width whether or not it's actually showing -
+       otherwise checking "Highlight in view" (which grows the metrics
+       results list enough to trigger a scrollbar) narrows the panel out
+       from under the Compute Metrics/checkbox row and wraps it. */
+    scrollbar-gutter: stable;
     padding: var(--space-3);
     display: none;
 }
@@ -231,6 +256,27 @@ button {
     letter-spacing: 0.04em;
     color: var(--text-muted);
     margin: 0 0 var(--space-2);
+}
+
+/* ---------- Utilities panel: grouped sections ---------- */
+.utilities-panel > .panel-section {
+    margin-bottom: 0;
+    padding-top: var(--space-3);
+}
+.utilities-panel > .panel-section:first-child {
+    padding-top: 0;
+}
+.utilities-panel > .panel-section + .panel-section {
+    border-top: 1px solid var(--border-color);
+    margin-top: var(--space-3);
+}
+.tool-group + .tool-group {
+    margin-top: var(--space-3);
+}
+.tool-group-label {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-bottom: var(--space-1);
 }
 
 .empty-hint {

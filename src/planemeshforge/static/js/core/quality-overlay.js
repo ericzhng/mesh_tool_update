@@ -57,9 +57,11 @@ class QualityOverlay {
         this._changed();
     }
 
-    async setEnabled(enabled) {
+    // Just a display toggle - it doesn't itself trigger a computation.
+    // Checking it before metrics exist simply means nothing is highlighted
+    // yet, until "Compute Metrics" is run (or re-run on a mesh edit).
+    setEnabled(enabled) {
         this.enabled = enabled;
-        if (enabled && this.elements.length === 0) await this.compute();
         this._changed();
     }
 

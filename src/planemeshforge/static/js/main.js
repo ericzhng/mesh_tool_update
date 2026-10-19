@@ -16,6 +16,7 @@ import { run } from "./commands/registry.js";
 import { buildMenubar } from "./ui/menubar.js";
 import { buildToolRail, buildViewportControls } from "./ui/toolbar.js";
 import { buildDock } from "./ui/dock.js";
+import { installDockResize } from "./ui/dock-resize.js";
 import { buildStatusBar } from "./ui/statusbar.js";
 import { buildScaleBar } from "./ui/scale-bar.js";
 import { installQualityTooltip } from "./ui/quality-tooltip.js";
@@ -84,6 +85,10 @@ async function main() {
     buildViewportControls(document.getElementById("viewport-controls"));
     buildScaleBar(document.getElementById("scale-bar"));
     buildDock(document.getElementById("dock"));
+    installDockResize(document.getElementById("dock"), document.getElementById("dock-resize-handle"), () => {
+        viewport.resize();
+        scheduleDraw();
+    });
     buildStatusBar(document.getElementById("status-bar"), canvas, document.getElementById("tool-hint"));
     installQualityTooltip(canvas, document.getElementById("quality-tooltip"));
     installContextMenu(canvas);

@@ -30,31 +30,16 @@ function selectedNodeIds() {
 
 export function buildUtilitiesPanel(root) {
     root.innerHTML = "";
+    // Scopes the section-divider/tool-group CSS to this panel so the
+    // generic `.panel-section` look used by Inspector/Sets stays untouched.
+    const panel = document.createElement("div");
+    panel.className = "utilities-panel";
+    root.appendChild(panel);
+    root = panel;
 
-    // ---- Snap ----
-    const snap = section("Snap");
-    snap.innerHTML += `
-        <div class="checkbox-row"><input type="checkbox" id="snap-grid"><label for="snap-grid">Snap to grid</label></div>
-        <div class="field-row"><label>Spacing</label><input type="number" id="snap-spacing" min="0.001" step="0.1" value="${viewport.gridSpacing}"></div>
-        <div class="checkbox-row"><input type="checkbox" id="snap-node"><label for="snap-node">Snap to node (single drag)</label></div>
-    `;
-    root.appendChild(snap);
-    const gridCheckbox = snap.querySelector("#snap-grid");
-    const spacingInput = snap.querySelector("#snap-spacing");
-    const nodeCheckbox = snap.querySelector("#snap-node");
-    gridCheckbox.checked = viewport.snapToGrid;
-    nodeCheckbox.checked = viewport.snapToNode;
-    gridCheckbox.addEventListener("change", () => (viewport.snapToGrid = gridCheckbox.checked));
-    spacingInput.addEventListener("change", () => {
-        viewport.gridSpacing = parseFloat(spacingInput.value) || 1;
-        // gridSpacing isn't part of pan/zoom, so nothing else schedules a
-        // redraw or tells the scale bar/status bar to refresh - without
-        // this the grid lines and scale bar would silently show the old
-        // spacing until the next pan/zoom.
-        bus.emit("viewport:changed", viewport);
-        scheduleDraw();
-    });
-    nodeCheckbox.addEventListener("change", () => (viewport.snapToNode = nodeCheckbox.checked));
+    // Ordered by how often each is reached for: shaping the selection
+    // (Transform) and cleaning up the mesh (Tools/Quality/Metrics) are
+    // everyday actions; Snap is a set-once editing aid, so it's last.
 
     // ---- Transform ----
     const transform = section("Transform Selected Nodes");
@@ -115,13 +100,24 @@ export function buildUtilitiesPanel(root) {
     }
 
     // ---- Mesh tools ----
+    // Split into "Cleanup" (fix up what's already there) and "Generate"
+    // (create new elements from the selection) - the four buttons used to
+    // run together in one row with no indication of which do which.
     const tools = section("Mesh Tools");
     tools.innerHTML += `
-        <div class="btn-row" style="flex-wrap:wrap">
-            <button class="btn" id="tool-merge">${icon("merge")}Merge Coincident Nodes</button>
-            <button class="btn" id="tool-renumber">Renumber IDs</button>
-            <button class="btn" id="tool-split">Split Selected Quads</button>
-            <button class="btn" id="tool-triangulate">Triangulate Selected Nodes</button>
+        <div class="tool-group">
+            <div class="tool-group-label">Cleanup</div>
+            <div class="btn-row" style="flex-wrap:wrap">
+                <button class="btn" id="tool-merge">${icon("merge")}Merge Coincident Nodes</button>
+                <button class="btn" id="tool-renumber">${icon("rename")}Renumber IDs</button>
+            </div>
+        </div>
+        <div class="tool-group">
+            <div class="tool-group-label">Generate</div>
+            <div class="btn-row" style="flex-wrap:wrap">
+                <button class="btn" id="tool-split">${icon("quad")}Split Selected Quads</button>
+                <button class="btn" id="tool-triangulate">${icon("triangle")}Triangulate Selected Nodes</button>
+            </div>
         </div>
     `;
     root.appendChild(tools);
@@ -223,7 +219,7 @@ export function buildUtilitiesPanel(root) {
     metrics.innerHTML += `
         <div class="btn-row metrics-actions">
             <button class="btn" id="metrics-compute">${icon("metrics")}Compute Metrics</button>
-            <div class="checkbox-row"><input type="checkbox" id="metrics-highlight"><label for="metrics-highlight">Highlight in view</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="metrics-highlight"><label for="metrics-highlight" title="Highlight flagged elements in the viewport">Highlight</label></div>
         </div>
         <div class="field-row metrics-limit-row"><label>Skew warn / bad</label>
             <input type="number" class="metrics-limit-input" id="m-skew-warn" min="0" max="1" step="0.05" value="${qualityOverlay.limits.skewnessWarn}">
@@ -361,8 +357,8 @@ export function buildUtilitiesPanel(root) {
         });
     }
 
-    highlightCheckbox.addEventListener("change", async () => {
-        await qualityOverlay.setEnabled(highlightCheckbox.checked);
+    highlightCheckbox.addEventListener("change", () => {
+        qualityOverlay.setEnabled(highlightCheckbox.checked);
         renderMetrics();
     });
 
@@ -384,4 +380,29 @@ export function buildUtilitiesPanel(root) {
     });
 
     renderMetrics();
+
+    // ---- Snap & Grid ----
+    const snap = section("Snap & Grid");
+    snap.innerHTML += `
+        <div class="checkbox-row"><input type="checkbox" id="snap-grid"><label for="snap-grid">Snap to grid</label></div>
+        <div class="field-row"><label>Spacing</label><input type="number" id="snap-spacing" min="0.001" step="0.1" value="${viewport.gridSpacing}"></div>
+        <div class="checkbox-row"><input type="checkbox" id="snap-node"><label for="snap-node">Snap to node (single drag)</label></div>
+    `;
+    root.appendChild(snap);
+    const gridCheckbox = snap.querySelector("#snap-grid");
+    const spacingInput = snap.querySelector("#snap-spacing");
+    const nodeCheckbox = snap.querySelector("#snap-node");
+    gridCheckbox.checked = viewport.snapToGrid;
+    nodeCheckbox.checked = viewport.snapToNode;
+    gridCheckbox.addEventListener("change", () => (viewport.snapToGrid = gridCheckbox.checked));
+    spacingInput.addEventListener("change", () => {
+        viewport.gridSpacing = parseFloat(spacingInput.value) || 1;
+        // gridSpacing isn't part of pan/zoom, so nothing else schedules a
+        // redraw or tells the scale bar/status bar to refresh - without
+        // this the grid lines and scale bar would silently show the old
+        // spacing until the next pan/zoom.
+        bus.emit("viewport:changed", viewport);
+        scheduleDraw();
+    });
+    nodeCheckbox.addEventListener("change", () => (viewport.snapToNode = nodeCheckbox.checked));
 }
