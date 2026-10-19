@@ -381,6 +381,115 @@ export function buildUtilitiesPanel(root) {
 
     renderMetrics();
 
+    // ---- Improve Mesh (automated smoothing recipes) ----
+    // Runs server-side as a single undoable op (core/improve/pipeline.py);
+    // "Flagged" reuses the Warn thresholds set above in Mesh Metrics so the
+    // two sections stay in sync without a separate set of limits here.
+    const improve = section("Improve Mesh");
+    improve.innerHTML += `
+        <div class="field-row"><label>Scope</label>
+            <select id="improve-scope">
+                <option value="all">All elements</option>
+                <option value="selection">Selection</option>
+                <option value="flagged">Flagged (warn+)</option>
+            </select>
+        </div>
+        <div class="field-row"><label>Grow rings</label>
+            <input type="number" id="improve-rings" min="0" step="1" value="0">
+        </div>
+        <div class="field-row"><label>Preset</label>
+            <select id="improve-preset">
+                <option value="gentle">Gentle (smooth only)</option>
+                <option value="balanced" selected>Balanced (merge + smooth)</option>
+                <option value="aggressive">Aggressive</option>
+            </select>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" id="improve-run">${icon("improve")}Run</button></div>
+        <div id="improve-results"></div>
+    `;
+    root.appendChild(improve);
+
+    function improveScopeArg() {
+        const mode = improve.querySelector("#improve-scope").value;
+        const grow_rings = parseInt(improve.querySelector("#improve-rings").value, 10) || 0;
+        if (mode === "selection") {
+            const element_ids = [...selection.elementIds];
+            if (!element_ids.length) return { error: "Select one or more elements first." };
+            return { scope: { mode: "elements", element_ids, grow_rings } };
+        }
+        if (mode === "flagged") {
+            return {
+                scope: {
+                    mode: "flagged",
+                    grow_rings,
+                    limits: { skewness: qualityOverlay.limits.skewnessWarn, aspect_ratio: qualityOverlay.limits.aspectRatioWarn },
+                },
+            };
+        }
+        return { scope: { mode: "all", grow_rings } };
+    }
+
+    function delta(before, after) {
+        return before == null || after == null ? null : after - before;
+    }
+
+    function deltaClass(d) {
+        if (d == null || Math.abs(d) < 1e-9) return "metrics-table-cell";
+        return d < 0 ? "metrics-table-cell improved" : "metrics-table-cell worsened";
+    }
+
+    function improveRow(label, before, after) {
+        const d = delta(before, after);
+        return `<span class="metrics-table-label">${label}</span>
+            <span class="metrics-table-cell">${fmt(before)}</span>
+            <span class="metrics-table-cell">${fmt(after)}</span>
+            <span class="${deltaClass(d)}">${d == null ? "–" : (d > 0 ? "+" : "") + d.toFixed(3)}</span>`;
+    }
+
+    function renderImproveResult(result) {
+        const resultsEl = improve.querySelector("#improve-results");
+        const skewBefore = result.before.skewness, skewAfter = result.after.skewness;
+        const aspectBefore = result.before.aspect_ratio, aspectAfter = result.after.aspect_ratio;
+        const movedCount = result.steps
+            .filter(s => s.op === "smooth_nodes")
+            .reduce((sum, s) => sum + (s.result.moved_node_ids?.length || 0), 0);
+
+        resultsEl.innerHTML = `
+            <div class="empty-hint">Ran ${result.steps.length} step(s). Moved ${movedCount} node(s).</div>
+            <div class="metrics-table">
+                <span class="metrics-table-head"></span>
+                <span class="metrics-table-head">Before</span>
+                <span class="metrics-table-head">After</span>
+                <span class="metrics-table-head">Δ</span>
+                ${improveRow("Skew mean", skewBefore?.mean, skewAfter?.mean)}
+                ${improveRow("Skew max", skewBefore?.max, skewAfter?.max)}
+                ${improveRow("Aspect mean", aspectBefore?.mean, aspectAfter?.mean)}
+                ${improveRow("Aspect max", aspectBefore?.max, aspectAfter?.max)}
+            </div>
+        `;
+    }
+
+    improve.querySelector("#improve-run").addEventListener("click", async () => {
+        const scopeArg = improveScopeArg();
+        if (scopeArg.error) {
+            toast.info(scopeArg.error);
+            return;
+        }
+        const preset = improve.querySelector("#improve-preset").value;
+        const runButton = improve.querySelector("#improve-run");
+        runButton.disabled = true;
+        try {
+            const result = await client.op("improve_quality", { preset, ...scopeArg });
+            if (!result.ok) {
+                toast.error(result.error);
+                return;
+            }
+            renderImproveResult(result);
+        } finally {
+            runButton.disabled = false;
+        }
+    });
+
     // ---- Snap & Grid ----
     const snap = section("Snap & Grid");
     snap.innerHTML += `

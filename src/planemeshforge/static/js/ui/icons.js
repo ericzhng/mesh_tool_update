@@ -37,6 +37,7 @@ const PATHS = {
     "close": '<path d="M4 4l8 8"/><path d="M12 4l-8 8"/>',
     "metrics": '<path d="M2 14V9"/><path d="M6.5 14V4"/><path d="M11 14V7"/><path d="M14 2L9 7 6.5 4.5 2 9"/>',
     "refresh": '<path d="M13.65 4.35a6 6 0 1 0 1.1 6.5"/><path d="M14.5 1.5v4h-4"/>',
+    "improve": '<path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.5 3.5l2 2M10.5 10.5l2 2M3.5 12.5l2-2M10.5 5.5l2-2"/><circle cx="8" cy="8" r="2"/>',
 };
 
 export function icon(name, extraClass = "") {

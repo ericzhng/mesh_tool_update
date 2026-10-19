@@ -417,6 +417,8 @@ button {
 }
 .metrics-table-cell.flagged { color: var(--warning); font-weight: 600; }
 .metrics-table-cell.flagged.bad { color: var(--danger); }
+.metrics-table-cell.improved { color: var(--success); font-weight: 600; }
+.metrics-table-cell.worsened { color: var(--danger); font-weight: 600; }
 
 .metrics-counts {
     display: flex;

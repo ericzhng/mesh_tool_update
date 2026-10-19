@@ -32,6 +32,15 @@ export function registerCommands() {
         },
     });
     define({
+        id: "mesh.improveQuality",
+        label: "Improve Mesh Quality (Balanced)",
+        icon: "improve",
+        run: async () => {
+            const result = await client.op("improve_quality", { preset: "balanced", scope: { mode: "all" } });
+            if (!result.ok) toast.error(result.error);
+        },
+    });
+    define({
         id: "file.clear",
         label: "Clear Mesh",
         icon: "trash",
