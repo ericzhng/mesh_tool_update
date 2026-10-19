@@ -5,6 +5,7 @@ import numpy as np
 from planemeshforge.abaqus_io import ElementBlock, Mesh
 from planemeshforge.core import quality
 from planemeshforge.core.improve import adjacency
+from planemeshforge.core.improve.flipping import flip_edges
 from planemeshforge.core.improve.pipeline import improve_quality
 from planemeshforge.core.improve.presets import PRESETS
 from planemeshforge.core.improve.smoothing import smooth_nodes
@@ -221,6 +222,97 @@ class TestImproveQuality(unittest.TestCase):
         )
         self.assertFalse(response["ok"])
         np.testing.assert_array_equal(editor.mesh.points, before_points)
+
+
+def _quad_mesh(diagonal: str) -> Mesh:
+    """A convex, non-parallelogram quad split by one of its two diagonals.
+    Diagonal "13" (nodes 1-3) is the Delaunay-legal choice; "24" is not."""
+    points = np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 2.0, 0.0], [0.0, 3.0, 0.0]])
+    if diagonal == "13":
+        conn = [[1, 2, 3], [1, 3, 4]]
+    else:
+        conn = [[1, 2, 4], [2, 3, 4]]
+    tri = ElementBlock("CGAX3", [1, 2], conn)
+    return Mesh(points=points, point_ids=[1, 2, 3, 4], cells=[tri])
+
+
+class TestFlipEdges(unittest.TestCase):
+    def test_rejects_missing_mesh(self):
+        with self.assertRaises(ValueError):
+            flip_edges(None)
+
+    def test_flips_the_bad_diagonal(self):
+        mesh = _quad_mesh("24")
+        before_min_angle = quality.metrics(mesh)["summary"]["min_angle"]["min"]
+
+        result = flip_edges(mesh)
+
+        self.assertEqual(result["flip_count"], 1)
+        self.assertEqual(sorted(result["flipped_edges"][0]), [2, 4])
+        after_min_angle = quality.metrics(mesh)["summary"]["min_angle"]["min"]
+        self.assertGreater(after_min_angle, before_min_angle)
+        # The diagonal is now 1-3: every element uses exactly nodes {1,2,3} or {1,3,4}.
+        conns = {frozenset(c) for b in mesh.cells for c in b.connectivity.tolist()}
+        self.assertEqual(conns, {frozenset({1, 2, 3}), frozenset({1, 3, 4})})
+
+    def test_leaves_the_good_diagonal_alone(self):
+        mesh = _quad_mesh("13")
+        before_conn = [b.connectivity.copy() for b in mesh.cells]
+
+        result = flip_edges(mesh)
+
+        self.assertEqual(result["flip_count"], 0)
+        for before, block in zip(before_conn, mesh.cells):
+            np.testing.assert_array_equal(before, block.connectivity)
+
+    def test_preserves_element_ids_and_no_inversions(self):
+        mesh = _quad_mesh("24")
+        before_ids = [list(b.ids) for b in mesh.cells]
+
+        flip_edges(mesh)
+
+        self.assertEqual([list(b.ids) for b in mesh.cells], before_ids)
+        for issue in quality.check(mesh):
+            self.assertNotIn(issue["kind"], ("inverted_element", "degenerate_element"))
+
+    def test_never_flips_a_boundary_or_quad_edge(self):
+        points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
+        quad = ElementBlock("CGAX4", [1], [[1, 2, 3, 4]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3, 4], cells=[quad])
+        result = flip_edges(mesh)
+        self.assertEqual(result["flip_count"], 0)
+
+    def test_never_flips_a_surface_set_edge(self):
+        # Same bad-diagonal quad, but the diagonal itself is pinned as a
+        # surface face (S2 of element 1 is nodes 2-4): it must stay put
+        # even though flipping it would improve quality.
+        mesh = _quad_mesh("24")
+        mesh.surface_sets["pinned"] = ["1", "S2"]
+        result = flip_edges(mesh)
+        self.assertEqual(result["flip_count"], 0)
+
+    def test_scope_elements_restricts_which_edges_are_considered(self):
+        mesh = _quad_mesh("24")
+        result = flip_edges(mesh, scope={"mode": "elements", "element_ids": [999]})
+        self.assertEqual(result["flip_count"], 0)
+
+    def test_op_registered_and_undoable_via_editor(self):
+        from planemeshforge.core.editor import MeshEditor
+
+        mesh = _quad_mesh("24")
+        editor = MeshEditor(mesh)
+        before_points = mesh.points.copy()
+
+        response = editor.apply("flip_edges", {})
+        self.assertTrue(response["ok"])
+        self.assertEqual(response["flip_count"], 1)
+
+        self.assertTrue(editor.undo())
+        np.testing.assert_array_equal(editor.mesh.points, before_points)
+
+    def test_balanced_and_aggressive_presets_include_flip_edges(self):
+        self.assertIn({"op": "flip_edges"}, PRESETS["balanced"])
+        self.assertIn({"op": "flip_edges"}, PRESETS["aggressive"])
 
 
 if __name__ == "__main__":

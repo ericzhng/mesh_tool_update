@@ -11,7 +11,7 @@ from .presets import PRESETS
 # Only step ops that are safe to run unattended as part of a recipe: they
 # don't delete geometry a user didn't ask to delete, and they're idempotent
 # enough to repeat across passes.
-ALLOWED_STEP_OPS = {"merge_nodes", "fix_orientation", "smooth_nodes"}
+ALLOWED_STEP_OPS = {"merge_nodes", "fix_orientation", "smooth_nodes", "flip_edges"}
 
 
 def improve_quality(
@@ -27,9 +27,9 @@ def improve_quality(
     Give either `steps` (a list of `{"op": name, **args}`, `name` in
     `ALLOWED_STEP_OPS`) or a built-in `preset` name (see `presets.PRESETS`),
     not both. `scope` and `limits`, if given, are merged into every
-    `smooth_nodes` step's own `scope` (a step's own `scope` wins on
-    conflicting keys), so a recipe can be aimed at e.g. just the flagged
-    elements without repeating that in every step.
+    `smooth_nodes`/`flip_edges` step's own `scope` (a step's own `scope`
+    wins on conflicting keys), so a recipe can be aimed at e.g. just the
+    flagged elements without repeating that in every step.
 
     `max_passes` reruns the full step list until the worst skewness stops
     improving or drops to/below `limits["skewness"]` (if given) - most
@@ -59,7 +59,7 @@ def improve_quality(
             if op_name not in ALLOWED_STEP_OPS:
                 raise ValueError(f"Step op not allowed in a recipe: {op_name!r}")
 
-            if op_name == "smooth_nodes":
+            if op_name in ("smooth_nodes", "flip_edges"):
                 step_args["scope"] = {**(scope or {}), **step_args.get("scope", {})}
                 if limits:
                     step_args["scope"].setdefault("limits", limits)

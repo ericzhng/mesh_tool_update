@@ -14,11 +14,14 @@ PRESETS: dict[str, list[dict]] = {
     ],
     "balanced": [
         {"op": "merge_nodes"},
+        {"op": "flip_edges"},
         {"op": "smooth_nodes", "method": "smart_laplacian", "iterations": 20, "omega": 0.5},
     ],
     "aggressive": [
         {"op": "merge_nodes"},
+        {"op": "flip_edges"},
         {"op": "smooth_nodes", "method": "laplacian", "iterations": 5, "omega": 0.3},
+        {"op": "flip_edges"},
         {"op": "smooth_nodes", "method": "smart_laplacian", "iterations": 30, "omega": 0.6},
     ],
 }

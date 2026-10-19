@@ -129,3 +129,42 @@ def resolve_node_scope(mesh: Mesh, adjacency: Adjacency, scope: dict | None = No
         node_ids = grown
 
     return node_ids - adjacency.fixed_node_ids
+
+
+def resolve_element_scope(mesh: Mesh, adjacency: Adjacency, scope: dict | None = None) -> set[int] | None:
+    """Like `resolve_node_scope`, but resolves to a set of target element
+    ids rather than free node ids - used by `flipping.flip_edges`, where
+    `"elements"`/`"flagged"` describe which triangles to consider for a
+    flip, not which nodes are movable (an edge flip never moves a node, so
+    there's no fixed-node concept here). Returns `None` for scope mode
+    `"all"`, meaning "don't restrict - consider every element".
+    """
+    scope = scope or {}
+    mode = scope.get("mode", "all")
+
+    if mode == "all":
+        element_ids = None
+    elif mode == "elements":
+        element_ids = set(scope.get("element_ids", []))
+    elif mode == "flagged":
+        limits = scope.get("limits", {})
+        skew_limit = limits.get("skewness", 0.5)
+        aspect_limit = limits.get("aspect_ratio", 5.0)
+        result = quality_mod.metrics(mesh)
+        element_ids = {
+            e["id"]
+            for e in result["elements"]
+            if e["skewness"] >= skew_limit or (e["aspect_ratio"] or 0) >= aspect_limit
+        }
+    else:
+        raise ValueError(f"Unknown scope mode: {mode!r}")
+
+    if element_ids is not None:
+        for _ in range(int(scope.get("grow_rings", 0))):
+            grown = set(element_ids)
+            for eid in element_ids:
+                for node_id in adjacency.element_to_nodes.get(eid, []):
+                    grown.update(adjacency.node_to_elements.get(node_id, ()))
+            element_ids = grown
+
+    return element_ids

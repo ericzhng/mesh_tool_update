@@ -13,6 +13,7 @@ import numpy as np
 from ..abaqus_io import Mesh, ElementBlock
 from . import transform as tf
 from . import topology as topo
+from .improve.flipping import flip_edges
 from .improve.pipeline import improve_quality
 from .improve.smoothing import smooth_nodes
 
@@ -351,6 +352,7 @@ OPS = {
     "split_quads": split_quads,
     "triangulate": triangulate,
     "smooth_nodes": smooth_nodes,
+    "flip_edges": flip_edges,
     "improve_quality": improve_quality,
     "create_set": create_set,
     "create_surface": create_surface,
