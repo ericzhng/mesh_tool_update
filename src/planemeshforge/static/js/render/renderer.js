@@ -64,24 +64,45 @@ function elementPolygon(element) {
     return element.node_ids.map(id => store.node(id)).filter(Boolean);
 }
 
-function drawElement(ctx, element, state) {
+function drawElement(ctx, element, state, { hideInterior = false } = {}) {
     const nodes = elementPolygon(element);
     if (nodes.length < 2) return;
     const screenPts = nodes.map(n => viewport.toScreen(n));
     const style = elementStyle(state);
+    const n = screenPts.length;
 
-    ctx.beginPath();
-    ctx.moveTo(screenPts[0].x, screenPts[0].y);
-    for (let i = 1; i < screenPts.length; i++) ctx.lineTo(screenPts[i].x, screenPts[i].y);
-    if (screenPts.length > 2) ctx.closePath();
-
-    if (screenPts.length > 2) {
+    if (n > 2) {
+        ctx.beginPath();
+        ctx.moveTo(screenPts[0].x, screenPts[0].y);
+        for (let i = 1; i < n; i++) ctx.lineTo(screenPts[i].x, screenPts[i].y);
+        ctx.closePath();
         ctx.fillStyle = style.fill;
         ctx.fill();
     }
+
     ctx.strokeStyle = style.stroke;
     ctx.lineWidth = style.width;
-    ctx.stroke();
+
+    if (n > 2 && hideInterior) {
+        // Stroke each edge individually, skipping ones shared with another
+        // 2D element (same boundary flag `store.js`'s `_reindexEdgeFaces`
+        // already computes for face picking) - the fill above still covers
+        // the whole element regardless.
+        for (let i = 0; i < n; i++) {
+            const face = store.edgeFaceMap.get(`${element.id}:${i}`);
+            if (face && !face.boundary) continue;
+            ctx.beginPath();
+            ctx.moveTo(screenPts[i].x, screenPts[i].y);
+            ctx.lineTo(screenPts[(i + 1) % n].x, screenPts[(i + 1) % n].y);
+            ctx.stroke();
+        }
+    } else {
+        ctx.beginPath();
+        ctx.moveTo(screenPts[0].x, screenPts[0].y);
+        for (let i = 1; i < n; i++) ctx.lineTo(screenPts[i].x, screenPts[i].y);
+        if (n > 2) ctx.closePath();
+        ctx.stroke();
+    }
 
     if (viewport.showElementLabels && viewport.scale >= LABEL_SCALE_THRESHOLD) {
         const cx = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
@@ -127,8 +148,11 @@ function drawElements(ctx) {
         let state = EntityState.DEFAULT;
         if (qualityLevel === QualityLevel.BAD) state = EntityState.QUALITY_BAD;
         else if (qualityLevel === QualityLevel.WARN) state = EntityState.QUALITY_WARN;
-        drawElement(ctx, element, state);
+        drawElement(ctx, element, state, { hideInterior: viewport.hideInteriorEdges });
     }
+    // Hover/selected/highlighted always draw their full outline - hiding
+    // part of the one element you're actively pointing at/selecting would
+    // read as a broken highlight, not a decluttered view.
     if (hovered) drawElement(ctx, hovered, EntityState.HOVER);
     for (const element of selected) drawElement(ctx, element, EntityState.SELECTED);
     for (const element of highlighted) drawElement(ctx, element, EntityState.HIGHLIGHT);

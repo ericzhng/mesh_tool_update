@@ -617,12 +617,20 @@ export function buildUtilitiesPanel(root) {
     const display = section("Display");
     display.innerHTML += `
         <div class="checkbox-row"><input type="checkbox" id="show-line-elements"><label for="show-line-elements">Show 1D elements</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="hide-interior-edges"><label for="hide-interior-edges" title="Stroke only each element's boundary edges - shared interior edges are skipped, fill colors are unaffected">Hide interior edges</label></div>
     `;
     root.appendChild(display);
     const lineElementsCheckbox = display.querySelector("#show-line-elements");
     lineElementsCheckbox.checked = viewport.showLineElements;
     lineElementsCheckbox.addEventListener("change", () => {
         viewport.showLineElements = lineElementsCheckbox.checked;
+        scheduleDraw();
+    });
+
+    const hideInteriorEdgesCheckbox = display.querySelector("#hide-interior-edges");
+    hideInteriorEdgesCheckbox.checked = viewport.hideInteriorEdges;
+    hideInteriorEdgesCheckbox.addEventListener("change", () => {
+        viewport.hideInteriorEdges = hideInteriorEdgesCheckbox.checked;
         scheduleDraw();
     });
 

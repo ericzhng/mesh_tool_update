@@ -20,6 +20,12 @@ class Viewport {
         // On by default (matches prior behavior, where there was no way to
         // hide them at all); turn off when they're cluttering the view.
         this.showLineElements = true;
+        // Stroke only each 2D element's boundary edges (used by exactly one
+        // element), skipping the ones shared with a neighbor - a dense
+        // interior mesh otherwise draws every internal edge too, which can
+        // bury the actual outline. Off by default (draws every edge, as
+        // before); fill color is unaffected either way.
+        this.hideInteriorEdges = false;
         // Set by tool-manager when the active tool needs every node visible
         // for picking (e.g. element-creation tools), overriding the normal
         // Abaqus-style "nodes hidden until hovered" behavior.
