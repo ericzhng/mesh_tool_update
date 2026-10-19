@@ -24,11 +24,12 @@ import { resolveSurfaceFaces, resolveSurfaceElementIds } from "../../core/surfac
 import * as client from "../../net/client.js";
 import { toast } from "../toast.js";
 import { icon } from "../icons.js";
-import { openSetEditor, closeSetEditor, isSetEditorOpen } from "./set-editor.js";
+import { openSetEditor, closeSetEditor, isSetEditorOpen, editingTarget } from "./set-editor.js";
 
-function setRow({ kind, name, count, onSelect, showIsolate, showHide, showEdit, onEdit }) {
+function setRow({ kind, name, count, onSelect, showIsolate, showHide, showEdit, onEdit, isEditing }) {
     const row = document.createElement("div");
-    row.className = "set-row";
+    row.className = isEditing ? "set-row set-row-editing" : "set-row";
+    row.dataset.setName = name;
 
     const nameEl = document.createElement("span");
     nameEl.className = "set-name";
@@ -95,11 +96,13 @@ export function buildSetsPanel(root) {
     // selects its members) - otherwise collapsing one group would pop back
     // open as soon as you clicked anything else in the panel.
     const openGroups = { "Node Sets": true, "Element Sets": true, "Surface Sets": true };
+    const GROUP_TITLE = { node: "Node Sets", element: "Element Sets", surface: "Surface Sets" };
 
     // The editor (ui/panels/set-editor.js) owns `editorHost` directly and
-    // outlives `render()` - it must never be touched by the innerHTML reset
-    // below, or every selection change while editing would wipe out its
-    // inputs and caret position.
+    // outlives `render()`. It docks inline next to the row it's editing
+    // (see below), so it can end up nested inside `listHost` - `render()`
+    // always detaches it first, before resetting `listHost.innerHTML`, so
+    // that reset never touches it and wipes out its inputs/caret position.
     const editorHost = document.createElement("div");
     const listHost = document.createElement("div");
     root.append(editorHost, listHost);
@@ -164,6 +167,12 @@ export function buildSetsPanel(root) {
     }
 
     function render() {
+        // Detach the editor before wiping listHost - it may currently be
+        // docked inline inside a group from the last render (see below),
+        // and listHost.innerHTML = "" would destroy it (inputs, caret,
+        // pending debounce) if it were still a descendant.
+        editorHost.remove();
+
         listHost.innerHTML = "";
         // Only one set is ever being worked on at a time - while the editor
         // is open, the rest of the list is just along for the ride (so
@@ -171,24 +180,32 @@ export function buildSetsPanel(root) {
         // working selection out from under it).
         listHost.classList.toggle("sets-list-busy", isSetEditorOpen());
 
-        const createSection = document.createElement("div");
-        createSection.className = "panel-section";
-        const present = CREATE_KINDS.filter(k => k.count() > 0);
-        if (!present.length) {
-            createSection.innerHTML = `<div class="empty-hint">Select some nodes, elements, or surface edges first.</div>`;
-        } else {
-            const row = document.createElement("div");
-            row.className = "btn-row";
-            present.forEach(({ kind, label, iconName, count }) => {
-                const btn = document.createElement("button");
-                btn.className = "btn btn-primary";
-                btn.innerHTML = `${icon(iconName)}Create ${label} Set (${count()})`;
-                btn.addEventListener("click", () => createSetFromSelection(kind));
-                row.appendChild(btn);
-            });
-            createSection.appendChild(row);
+        const target = editingTarget();
+        const isEditingRow = (kind, name) => !!target && target.kind === kind && target.name === name;
+
+        // While the editor is open there's nothing useful "Create X Set"
+        // could do (its own selection-driven Add/Remove already covers
+        // that), so it's skipped entirely rather than shown greyed out.
+        if (!isSetEditorOpen()) {
+            const createSection = document.createElement("div");
+            createSection.className = "panel-section";
+            const present = CREATE_KINDS.filter(k => k.count() > 0);
+            if (!present.length) {
+                createSection.innerHTML = `<div class="empty-hint">Select some nodes, elements, or surface edges first.</div>`;
+            } else {
+                const row = document.createElement("div");
+                row.className = "btn-row";
+                present.forEach(({ kind, label, iconName, count }) => {
+                    const btn = document.createElement("button");
+                    btn.className = "btn btn-primary";
+                    btn.innerHTML = `${icon(iconName)}Create ${label} Set (${count()})`;
+                    btn.addEventListener("click", () => createSetFromSelection(kind));
+                    row.appendChild(btn);
+                });
+                createSection.appendChild(row);
+            }
+            listHost.appendChild(createSection);
         }
-        listHost.appendChild(createSection);
 
         const nodeRows = Object.entries(store.mesh.node_sets).map(([name, ids]) =>
             setRow({
@@ -204,6 +221,7 @@ export function buildSetsPanel(root) {
                 showHide: false,
                 showEdit: true,
                 onEdit: () => editSet("node", name, ids),
+                isEditing: isEditingRow("node", name),
             })
         );
         const elementRows = Object.entries(store.mesh.element_sets).map(([name, ids]) =>
@@ -216,6 +234,7 @@ export function buildSetsPanel(root) {
                 showHide: true,
                 showEdit: true,
                 onEdit: () => editSet("element", name, ids),
+                isEditing: isEditingRow("element", name),
             })
         );
         const surfaceRows = Object.entries(store.mesh.surface_sets).map(([name, tokens]) => {
@@ -235,6 +254,7 @@ export function buildSetsPanel(root) {
                     showHide: false,
                     showEdit: true,
                     onEdit: () => editSurfaceSet(name, faceKeys),
+                    isEditing: isEditingRow("surface", name),
                 });
             }
             // Legacy import: a plain reference to element sets, no face geometry.
@@ -248,12 +268,31 @@ export function buildSetsPanel(root) {
                 showHide: false,
                 showEdit: true,
                 onEdit: () => editLegacySurfaceSet(name),
+                isEditing: isEditingRow("surface", name),
             });
         });
 
-        listHost.appendChild(group("Node Sets", nodeRows));
-        listHost.appendChild(group("Element Sets", elementRows));
-        listHost.appendChild(group("Surface Sets", surfaceRows));
+        const groupsByKind = {
+            node: group(GROUP_TITLE.node, nodeRows),
+            element: group(GROUP_TITLE.element, elementRows),
+            surface: group(GROUP_TITLE.surface, surfaceRows),
+        };
+        listHost.append(groupsByKind.node, groupsByKind.element, groupsByKind.surface);
+
+        // Dock the editor right under the row it's editing (and keep that
+        // group expanded so it's actually visible) instead of always at a
+        // fixed spot - much easier to get back to than scrolling to the top
+        // every time. A brand-new set has no row yet, so it falls back to
+        // sitting above the list.
+        const targetGroup = target && groupsByKind[target.kind];
+        const targetRow = targetGroup?.querySelector(`[data-set-name="${CSS.escape(target.name)}"]`);
+        if (targetRow) {
+            targetGroup.open = true;
+            openGroups[GROUP_TITLE[target.kind]] = true;
+            targetRow.insertAdjacentElement("afterend", editorHost);
+        } else {
+            root.insertBefore(editorHost, listHost);
+        }
     }
 
     bus.on("mesh:changed", render);

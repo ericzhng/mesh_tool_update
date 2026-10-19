@@ -38,6 +38,14 @@ export function isSetEditorOpen() {
     return !!current;
 }
 
+// Lets the Sets panel dock the editor right under the row it's editing
+// (and bold that row) instead of always at a fixed spot - `null` while
+// creating a brand-new set, since there's no existing row to anchor to.
+export function editingTarget() {
+    if (!current || current.isNew) return null;
+    return { kind: current.kind, name: current.originalName };
+}
+
 // `host` is cleared and (re)populated here; it must stay outside whatever
 // container the Sets panel re-renders on every mesh/selection change, or
 // the editor's inputs/caret would get wiped out from under the user.

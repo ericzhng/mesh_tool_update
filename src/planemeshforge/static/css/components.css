@@ -345,6 +345,7 @@ button {
 }
 .set-row:hover { background: var(--bg-hover); }
 .set-row.selected { background: var(--bg-selected); }
+.set-row.set-row-editing .set-name { font-weight: 700; color: var(--text-primary); }
 .set-row .set-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .set-row .set-count { color: var(--text-muted); font-size: var(--font-size-xs); }
 .set-row button { border: none; background: transparent; color: var(--text-muted); padding: 2px; display: flex; }
@@ -629,9 +630,21 @@ button {
     flex-basis: 100%;
     height: 0;
 }
-.sets-list-busy {
+/* The editor now docks inline inside listHost, right under the row it's
+   editing, rather than listHost always being a plain sibling - so "busy"
+   dims/disables the rows and group headers individually instead of the
+   whole container (that would dim/disable the nested editor too: opacity
+   on an ancestor always composites its descendants, even ones styled back
+   to opacity: 1). The "Create X Set" section is skipped entirely while
+   busy (see sets.js), so it doesn't need a rule here. */
+.sets-list-busy .set-row,
+.sets-list-busy .set-group summary,
+.sets-list-busy .empty-hint {
     opacity: 0.5;
     pointer-events: none;
+}
+.sets-list-busy .set-row.set-row-editing {
+    opacity: 1;
 }
 
 /* ---------- Edit-mode badge ---------- */
