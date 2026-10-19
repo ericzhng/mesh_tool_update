@@ -8,6 +8,7 @@ from planemeshforge.core.improve import adjacency
 from planemeshforge.core.improve.flipping import flip_edges
 from planemeshforge.core.improve.pipeline import improve_quality
 from planemeshforge.core.improve.presets import PRESETS
+from planemeshforge.core.improve.refine import refine_slivers
 from planemeshforge.core.improve.smoothing import smooth_nodes
 
 
@@ -56,14 +57,42 @@ class TestAdjacency(unittest.TestCase):
         for node_id in interior_ids:
             self.assertNotIn(node_id, adj.fixed_node_ids)
 
-    def test_surface_set_nodes_are_fixed(self):
-        points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.5, 0.5, 0.0]])
-        tri = ElementBlock("CGAX3", [1, 2, 3, 4], [[1, 2, 5], [2, 3, 5], [3, 4, 5], [4, 1, 5]])
-        mesh = Mesh(points=points, point_ids=[1, 2, 3, 4, 5], cells=[tri], surface_sets={"s1": ["1", "S1"]})
+    @staticmethod
+    def _grid_3x3_with_interior_surface_edge():
+        """A 3x3-node grid (8 triangles) with a surface face on the
+        *interior* diagonal edge (2, 5) - node 5 is the fully interior
+        center node, never on the true mesh boundary. Used to tell apart
+        "this node is on a physical surface" from "this node is on the
+        mesh boundary", which a single-ring mesh (every surface edge also
+        happens to be the outer boundary) can't distinguish."""
+        points = np.array(
+            [
+                [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [2.0, 1.0, 0.0],
+                [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], [2.0, 2.0, 0.0],
+            ]
+        )
+        conn = [
+            [1, 2, 5], [1, 5, 4],
+            [2, 3, 6], [2, 6, 5],
+            [4, 5, 8], [4, 8, 7],
+            [5, 6, 9], [5, 9, 8],
+        ]
+        tri = ElementBlock("CGAX3", list(range(1, 9)), conn)
+        # Face S2 of element 1 ([1, 2, 5]) is the edge between nodes 2 and
+        # 5 - shared with element 4 ([2, 6, 5]), i.e. interior.
+        return Mesh(points=points, point_ids=list(range(1, 10)), cells=[tri], surface_sets={"s1": ["1", "S2"]})
+
+    def test_surface_set_nodes_are_not_fixed_by_default(self):
+        mesh = self._grid_3x3_with_interior_surface_edge()
         adj = adjacency.build(mesh)
-        # Face S1 of element 1 ([1, 2, 5]) is the edge between nodes 1 and 2.
-        self.assertIn(1, adj.fixed_node_ids)
-        self.assertIn(2, adj.fixed_node_ids)
+        self.assertNotIn(5, adj.boundary_node_ids)
+        self.assertNotIn(5, adj.fixed_node_ids)
+
+    def test_lock_surface_sets_opts_into_fixing_surface_nodes(self):
+        mesh = self._grid_3x3_with_interior_surface_edge()
+        adj = adjacency.build(mesh, lock_surface_sets=True)
+        self.assertIn(5, adj.fixed_node_ids)
 
 
 class TestSmoothNodes(unittest.TestCase):
@@ -172,6 +201,16 @@ class TestImproveQuality(unittest.TestCase):
                 self.assertTrue(result["steps"])
                 for issue in quality.check(mesh):
                     self.assertNotIn(issue["kind"], ("inverted_element", "degenerate_element"))
+
+    def test_progress_callback_fires_once_per_step(self):
+        mesh = _structured_grid(n=5, jitter=0.4, seed=7)
+        calls = []
+        improve_quality(mesh, preset="balanced", progress=calls.append)
+        self.assertEqual(len(calls), 3)  # merge_nodes, flip_edges, smooth_nodes
+        self.assertEqual([c["op"] for c in calls], ["merge_nodes", "flip_edges", "smooth_nodes"])
+        self.assertEqual([c["step"] for c in calls], [1, 2, 3])
+        for call in calls:
+            self.assertIn("skewness", call["after"])
 
     def test_custom_steps_and_scope_limits_are_merged_into_smooth_nodes(self):
         mesh = _structured_grid(n=5, jitter=0.4, seed=8)
@@ -313,6 +352,111 @@ class TestFlipEdges(unittest.TestCase):
     def test_balanced_and_aggressive_presets_include_flip_edges(self):
         self.assertIn({"op": "flip_edges"}, PRESETS["balanced"])
         self.assertIn({"op": "flip_edges"}, PRESETS["aggressive"])
+
+
+class TestRefineSlivers(unittest.TestCase):
+    def test_rejects_missing_mesh(self):
+        with self.assertRaises(ValueError):
+            refine_slivers(None)
+
+    def test_splits_a_boundary_sliver_into_two(self):
+        # A long, scalene sliver with no neighbor: splitting its longest
+        # edge (opposite the obtuse apex) can't change the two small
+        # angles at that edge's own endpoints (a split point sits on the
+        # same ray, so their direction - and therefore their angle - is
+        # unchanged by construction) but does measurably help the side
+        # that inherits the apex's share of the angle.
+        points = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.3, 1.0, 0.0]])
+        tri = ElementBlock("CGAX3", [1], [[1, 2, 3]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3], cells=[tri])
+        before_elements = quality.metrics(mesh)["elements"]
+
+        result = refine_slivers(mesh, skew_threshold=0.5)
+
+        self.assertEqual(result["removed_element_ids"], [1])
+        self.assertEqual(len(result["created_node_ids"]), 1)
+        self.assertEqual(len(result["created_element_ids"]), 2)
+        self.assertEqual(sum(len(b.ids) for b in mesh.cells), 2)
+        after_elements = quality.metrics(mesh)["elements"]
+        self.assertLess(min(e["skewness"] for e in after_elements), before_elements[0]["skewness"])
+        for issue in quality.check(mesh):
+            self.assertNotIn(issue["kind"], ("inverted_element", "degenerate_element"))
+
+    def test_splits_an_interior_sliver_pair_into_four(self):
+        # Two triangles sharing edge (1, 2) as their mutual longest edge
+        # (10 vs ~5.02 for the other two sides of each) - an interior split
+        # replaces both with 4 children around the new midpoint node.
+        points = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [5.0, 0.5, 0.0], [5.0, -0.5, 0.0]])
+        tri = ElementBlock("CGAX3", [1, 2], [[1, 2, 3], [2, 1, 4]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3, 4], cells=[tri])
+
+        result = refine_slivers(mesh, skew_threshold=0.5)
+
+        self.assertEqual(sorted(result["removed_element_ids"]), [1, 2])
+        self.assertEqual(len(result["created_node_ids"]), 1)
+        self.assertEqual(len(result["created_element_ids"]), 4)
+        self.assertEqual(sum(len(b.ids) for b in mesh.cells), 4)
+        for issue in quality.check(mesh):
+            self.assertNotIn(issue["kind"], ("inverted_element", "degenerate_element"))
+
+    def test_skips_a_sliver_whose_long_edge_borders_a_quad(self):
+        # Triangle (1,2,3)'s longest edge is (1,2), shared with quad
+        # (2,1,5,6) - splitting it would leave a non-conforming T-junction
+        # against the quad, so it must be left alone.
+        points = np.array(
+            [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.3, 1.0, 0.0], [0.0, -1.0, 0.0], [10.0, -1.0, 0.0]]
+        )
+        tri = ElementBlock("CGAX3", [1], [[1, 2, 3]])
+        quad = ElementBlock("CGAX4", [2], [[2, 1, 4, 5]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3, 4, 5], cells=[tri, quad])
+
+        result = refine_slivers(mesh, skew_threshold=0.5)
+
+        self.assertEqual(result["skipped_element_ids"], [1])
+        self.assertEqual(result["removed_element_ids"], [])
+        self.assertEqual(sum(len(b.ids) for b in mesh.cells), 2)
+
+    def test_skips_a_sliver_whose_long_edge_is_a_locked_surface_face(self):
+        points = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.3, 1.0, 0.0]])
+        tri = ElementBlock("CGAX3", [1], [[1, 2, 3]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3], cells=[tri], surface_sets={"pinned": ["1", "S1"]})
+
+        result = refine_slivers(mesh, skew_threshold=0.5)
+
+        self.assertEqual(result["skipped_element_ids"], [1])
+        self.assertEqual(result["removed_element_ids"], [])
+
+    def test_preserves_elem_sets_and_remaps_surface_sets(self):
+        points = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.3, 1.0, 0.0]])
+        tri = ElementBlock("CGAX3", [1], [[1, 2, 3]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3], cells=[tri], elem_sets={"s": [1]})
+
+        result = refine_slivers(mesh, skew_threshold=0.5)
+
+        self.assertEqual(mesh.elem_sets["s"], [])
+        self.assertEqual(sorted(mesh.point_ids), [1, 2, 3, result["created_node_ids"][0]])
+        mesh._validate_data()
+
+    def test_op_registered_and_undoable_via_editor(self):
+        from planemeshforge.core.editor import MeshEditor
+
+        points = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.3, 1.0, 0.0]])
+        tri = ElementBlock("CGAX3", [1], [[1, 2, 3]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3], cells=[tri])
+        editor = MeshEditor(mesh)
+        before_points = mesh.points.copy()
+
+        response = editor.apply("refine_slivers", {"skew_threshold": 0.5})
+        self.assertTrue(response["ok"])
+        self.assertEqual(len(response["created_node_ids"]), 1)
+
+        self.assertTrue(editor.undo())
+        np.testing.assert_array_equal(editor.mesh.points, before_points)
+
+    def test_aggressive_preset_includes_refine_slivers(self):
+        self.assertTrue(any(step["op"] == "refine_slivers" for step in PRESETS["aggressive"]))
+        self.assertFalse(any(step["op"] == "refine_slivers" for step in PRESETS["gentle"]))
+        self.assertFalse(any(step["op"] == "refine_slivers" for step in PRESETS["balanced"]))
 
 
 if __name__ == "__main__":

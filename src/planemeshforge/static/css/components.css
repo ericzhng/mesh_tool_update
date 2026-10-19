@@ -478,6 +478,25 @@ button {
 }
 .btn-link:hover { text-decoration: underline; }
 
+/* ---------- Improve Mesh progress (see utilities.js) ---------- */
+.improve-status {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    align-self: center;
+}
+.improve-log {
+    max-height: 110px;
+    overflow-y: auto;
+    margin-top: var(--space-1);
+}
+.improve-log-row {
+    font-size: var(--font-size-xs);
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    padding: 1px 2px;
+}
+
 /* ---------- Context menu ---------- */
 #context-menu {
     position: fixed;

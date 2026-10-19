@@ -476,10 +476,15 @@ export function buildUtilitiesPanel(root) {
             <select id="improve-preset">
                 <option value="gentle">Gentle (smooth only)</option>
                 <option value="balanced" selected>Balanced (merge + smooth)</option>
-                <option value="aggressive">Aggressive</option>
+                <option value="aggressive">Aggressive (+ split slivers)</option>
             </select>
         </div>
-        <div class="btn-row"><button class="btn btn-primary" id="improve-run">${icon("improve")}Run</button></div>
+        <div class="checkbox-row"><input type="checkbox" id="improve-lock-surfaces"><label for="improve-lock-surfaces" title="A *SURFACE reference is topological (element + face), not a position - leave this off unless a surface's exact geometry must stay fixed.">Preserve surface-set geometry</label></div>
+        <div class="btn-row">
+            <button class="btn btn-primary" id="improve-run">${icon("improve")}Run</button>
+            <span id="improve-status" class="improve-status"></span>
+        </div>
+        <div id="improve-log" class="improve-log"></div>
         <div id="improve-results"></div>
     `;
     root.appendChild(improve);
@@ -487,21 +492,23 @@ export function buildUtilitiesPanel(root) {
     function improveScopeArg() {
         const mode = improve.querySelector("#improve-scope").value;
         const grow_rings = parseInt(improve.querySelector("#improve-rings").value, 10) || 0;
+        const lock_surface_sets = improve.querySelector("#improve-lock-surfaces").checked;
         if (mode === "selection") {
             const element_ids = [...selection.elementIds];
             if (!element_ids.length) return { error: "Select one or more elements first." };
-            return { scope: { mode: "elements", element_ids, grow_rings } };
+            return { scope: { mode: "elements", element_ids, grow_rings, lock_surface_sets } };
         }
         if (mode === "flagged") {
             return {
                 scope: {
                     mode: "flagged",
                     grow_rings,
+                    lock_surface_sets,
                     limits: { skewness: qualityOverlay.limits.skewnessWarn, aspect_ratio: qualityOverlay.limits.aspectRatioWarn },
                 },
             };
         }
-        return { scope: { mode: "all", grow_rings } };
+        return { scope: { mode: "all", grow_rings, lock_surface_sets } };
     }
 
     function delta(before, after) {
@@ -528,9 +535,19 @@ export function buildUtilitiesPanel(root) {
         const movedCount = result.steps
             .filter(s => s.op === "smooth_nodes")
             .reduce((sum, s) => sum + (s.result.moved_node_ids?.length || 0), 0);
+        const flippedCount = result.steps
+            .filter(s => s.op === "flip_edges")
+            .reduce((sum, s) => sum + (s.result.flip_count || 0), 0);
+        const splitCount = result.steps
+            .filter(s => s.op === "refine_slivers")
+            .reduce((sum, s) => sum + (s.result.created_element_ids?.length || 0), 0);
+
+        const parts = [`Ran ${result.steps.length} step(s).`, `Moved ${movedCount} node(s).`];
+        if (flippedCount) parts.push(`Flipped ${flippedCount} edge(s).`);
+        if (splitCount) parts.push(`Split in ${splitCount} new element(s).`);
 
         resultsEl.innerHTML = `
-            <div class="empty-hint">Ran ${result.steps.length} step(s). Moved ${movedCount} node(s).</div>
+            <div class="empty-hint">${parts.join(" ")}</div>
             <div class="metrics-table">
                 <span class="metrics-table-head"></span>
                 <span class="metrics-table-head">Before</span>
@@ -544,6 +561,15 @@ export function buildUtilitiesPanel(root) {
         `;
     }
 
+    function appendImproveLogRow(text) {
+        const logEl = improve.querySelector("#improve-log");
+        const row = document.createElement("div");
+        row.className = "improve-log-row";
+        row.textContent = text;
+        logEl.appendChild(row);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
     improve.querySelector("#improve-run").addEventListener("click", async () => {
         const scopeArg = improveScopeArg();
         if (scopeArg.error) {
@@ -552,7 +578,23 @@ export function buildUtilitiesPanel(root) {
         }
         const preset = improve.querySelector("#improve-preset").value;
         const runButton = improve.querySelector("#improve-run");
+        const statusEl = improve.querySelector("#improve-status");
+        improve.querySelector("#improve-log").innerHTML = "";
+        improve.querySelector("#improve-results").innerHTML = "";
+
+        // Some presets (especially Aggressive, on a large real-world mesh)
+        // genuinely take several seconds - without this, clicking Run
+        // looked identical to nothing happening at all.
         runButton.disabled = true;
+        const startedAt = performance.now();
+        const tick = () => { statusEl.textContent = `Running… ${((performance.now() - startedAt) / 1000).toFixed(1)}s`; };
+        tick();
+        const elapsedTimer = setInterval(tick, 200);
+        const unsubscribe = client.onImproveProgress(info => {
+            const skewMax = info.after?.skewness?.max;
+            appendImproveLogRow(`Step ${info.step}/${info.total_steps}: ${info.op}${skewMax != null ? ` - skew max ${fmt(skewMax)}` : ""}`);
+        });
+
         try {
             const result = await client.op("improve_quality", { preset, ...scopeArg });
             if (!result.ok) {
@@ -561,6 +603,9 @@ export function buildUtilitiesPanel(root) {
             }
             renderImproveResult(result);
         } finally {
+            clearInterval(elapsedTimer);
+            statusEl.textContent = "";
+            unsubscribe();
             runButton.disabled = false;
         }
     });

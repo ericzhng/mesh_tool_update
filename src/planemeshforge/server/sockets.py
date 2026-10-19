@@ -28,7 +28,17 @@ def register_sockets(socketio: SocketIO, editor: MeshEditor, storage: SessionSto
     def handle_op(data, ack=None):
         op_name = data.get("op")
         args = data.get("args", {})
-        result = editor.apply(op_name, args)
+        extra_kwargs = {}
+        if op_name == "improve_quality":
+            # `improve_quality` can run for several seconds on a large
+            # mesh (merge/flip/smooth/refine passes); emitting here, mid-
+            # handler, reaches the client immediately on its own
+            # connection (this app's Flask-SocketIO runs in the default
+            # threading async mode, where that just works) - no other op
+            # is slow enough to need this, so it's a narrow special case
+            # rather than new generic plumbing.
+            extra_kwargs["progress"] = lambda info: emit("improve_progress", info)
+        result = editor.apply(op_name, args, extra_kwargs=extra_kwargs)
         if result.get("ok"):
             broadcast_state()
         return result

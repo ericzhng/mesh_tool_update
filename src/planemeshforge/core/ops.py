@@ -15,6 +15,7 @@ from . import transform as tf
 from . import topology as topo
 from .improve.flipping import flip_edges
 from .improve.pipeline import improve_quality
+from .improve.refine import refine_slivers
 from .improve.smoothing import smooth_nodes
 
 
@@ -353,6 +354,7 @@ OPS = {
     "triangulate": triangulate,
     "smooth_nodes": smooth_nodes,
     "flip_edges": flip_edges,
+    "refine_slivers": refine_slivers,
     "improve_quality": improve_quality,
     "create_set": create_set,
     "create_surface": create_surface,

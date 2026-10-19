@@ -26,13 +26,24 @@ class Adjacency:
     fixed_node_ids: set[int] = field(default_factory=set)
 
 
-def build(mesh: Mesh, extra_fixed_node_ids: set[int] | None = None) -> Adjacency:
+def build(
+    mesh: Mesh, extra_fixed_node_ids: set[int] | None = None, lock_surface_sets: bool = False
+) -> Adjacency:
     """Builds node/element adjacency and the fixed-node set for `mesh`.
 
-    A node is fixed (never relocated) if it lies on the mesh boundary (an
-    edge used by exactly one 2D element), belongs to a 1D element (e.g.
-    SFMGAX1), is referenced by a surface set, or is explicitly passed in
+    A node is always fixed (never relocated) if it lies on the mesh
+    boundary (an edge used by exactly one 2D element), belongs to a 1D
+    element (e.g. SFMGAX1), or is explicitly passed in
     `extra_fixed_node_ids`. Interior nodes of 2D elements are free.
+
+    `lock_surface_sets=True` additionally fixes every node referenced by
+    any `*SURFACE` set. Off by default: a `*SURFACE, TYPE=ELEMENT` token is
+    a topological reference (element id + face label), not a geometric
+    constraint, so most of the time there's nothing to protect by locking
+    it - and in a real deck, contact/tie surfaces can cover the majority of
+    the mesh, which would otherwise make smoothing/flipping unable to touch
+    the very elements most in need of it. Opt back in when a surface's
+    exact position genuinely matters (e.g. a precisely-defined contact face).
     """
     id_to_index = {pid: i for i, pid in enumerate(mesh.point_ids)}
     node_to_elements: dict[int, list[int]] = defaultdict(list)
@@ -68,13 +79,14 @@ def build(mesh: Mesh, extra_fixed_node_ids: set[int] | None = None) -> Adjacency
             boundary_node_ids.add(b)
 
     surface_node_ids: set[int] = set()
-    for tokens in mesh.surface_sets.values():
-        for token, _label in surface_pairs(tokens):
-            element_ids = [int(token)] if token.lstrip("-").isdigit() else mesh.elem_sets.get(token, [])
-            for eid in element_ids:
-                nodes = element_to_nodes.get(int(eid))
-                if nodes:
-                    surface_node_ids.update(nodes)
+    if lock_surface_sets:
+        for tokens in mesh.surface_sets.values():
+            for token, _label in surface_pairs(tokens):
+                element_ids = [int(token)] if token.lstrip("-").isdigit() else mesh.elem_sets.get(token, [])
+                for eid in element_ids:
+                    nodes = element_to_nodes.get(int(eid))
+                    if nodes:
+                        surface_node_ids.update(nodes)
 
     fixed_node_ids = boundary_node_ids | line_node_ids | surface_node_ids
     if extra_fixed_node_ids:

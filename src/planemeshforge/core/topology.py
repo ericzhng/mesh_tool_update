@@ -3,7 +3,9 @@ and quad-to-triangle splitting."""
 
 from __future__ import annotations
 
+import math
 import re
+from collections import defaultdict
 
 import numpy as np
 
@@ -139,13 +141,38 @@ def merge_coincident_nodes(
     candidate_ids = set(node_ids) if node_ids is not None else set(mesh.point_ids)
     id_to_index = {pid: i for i, pid in enumerate(mesh.point_ids)}
 
-    merge_map: dict[int, int] = {}
+    # A plain pairwise scan is O(n^2) - fine for a few hundred nodes, but a
+    # multi-thousand-node mesh (a real Abaqus deck) turns this into the
+    # single slowest step of any `improve_quality` preset that calls it.
+    # Bucket nodes into a uniform grid sized to `tolerance`: any two points
+    # within `tolerance` of each other must land in the same or a
+    # (26-connected) neighboring cell, so only those need the exact
+    # distance check - same merge decisions as the full scan, far fewer of
+    # them.
     n = len(mesh.point_ids)
+    cell_size = tolerance if tolerance > 0 else 1e-12
+
+    def cell_of(index: int) -> tuple[int, int, int]:
+        p = mesh.points[index]
+        return (math.floor(p[0] / cell_size), math.floor(p[1] / cell_size), math.floor(p[2] / cell_size))
+
+    buckets: dict[tuple[int, int, int], list[int]] = defaultdict(list)
+    for i in range(n):
+        buckets[cell_of(i)].append(i)
+    neighbor_offsets = [(dx, dy, dz) for dx in (-1, 0, 1) for dy in (-1, 0, 1) for dz in (-1, 0, 1)]
+
+    merge_map: dict[int, int] = {}
     for i in range(n):
         id_i = mesh.point_ids[i]
         if id_i in merge_map:
             continue
-        for j in range(i + 1, n):
+        cx, cy, cz = cell_of(i)
+        nearby_js: set[int] = set()
+        for dx, dy, dz in neighbor_offsets:
+            for j in buckets.get((cx + dx, cy + dy, cz + dz), ()):
+                if j > i:
+                    nearby_js.add(j)
+        for j in sorted(nearby_js):
             id_j = mesh.point_ids[j]
             if id_j in merge_map:
                 continue

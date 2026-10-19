@@ -41,7 +41,7 @@ class MeshEditor:
         self._undo.append(self.mesh.copy() if self.mesh is not None else None)
         self._redo.clear()
 
-    def apply(self, op_name: str, args: dict) -> dict:
+    def apply(self, op_name: str, args: dict, extra_kwargs: dict | None = None) -> dict:
         """Applies a named operation from the `ops` registry.
 
         Snapshots the current mesh first so the change can be undone. If the
@@ -49,6 +49,12 @@ class MeshEditor:
         message is returned as `{ok: False, error: ...}` without having
         mutated the visible state (the mesh may be partially mutated
         in-place, so on failure it is restored from the snapshot).
+
+        `extra_kwargs`, if given, are merged into the op call alongside
+        `args` - the one place a server-only, non-JSON-serializable
+        parameter (e.g. a progress callback) can reach an op without
+        touching the client-facing `args` contract. See `server/sockets.py`
+        for the only current use (live progress for `improve_quality`).
         """
         if op_name != "clear_mesh" and op_name not in OPS:
             return {"ok": False, "error": f"Unknown operation: {op_name}"}
@@ -60,7 +66,7 @@ class MeshEditor:
                 self.mesh = None
                 result = {}
             else:
-                result = OPS[op_name](self.mesh, **args)
+                result = OPS[op_name](self.mesh, **args, **(extra_kwargs or {}))
                 if "mesh" in result:
                     self.mesh = result.pop("mesh")
             if self.mesh is not None:

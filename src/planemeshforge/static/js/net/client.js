@@ -47,3 +47,12 @@ export function qualityCheck() {
 export function qualityMetrics() {
     return ack("quality_metrics");
 }
+
+// `improve_quality` can run for several seconds on a large mesh; the
+// server emits one of these per completed recipe step while it's running
+// (see server/sockets.py), so the UI can show live progress instead of a
+// single opaque wait. Returns an unsubscribe function.
+export function onImproveProgress(callback) {
+    socket.on("improve_progress", callback);
+    return () => socket.off("improve_progress", callback);
+}
