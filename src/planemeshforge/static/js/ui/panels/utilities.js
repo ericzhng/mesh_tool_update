@@ -454,6 +454,12 @@ export function buildUtilitiesPanel(root) {
         selectByLevel(QualityLevel.BAD, "bad");
     });
 
+    // Keeps the rendered table in sync with `qualityOverlay`'s own state,
+    // which can change on its own (e.g. it recomputes on every mesh edit
+    // while Highlight is on, or gets dropped to empty by "project:reset"
+    // below) - without this, the table only ever reflected the last click
+    // made inside this panel.
+    bus.on("quality:changed", renderMetrics);
     renderMetrics();
 
     // ---- Improve Mesh (automated smoothing recipes) ----
@@ -619,6 +625,17 @@ export function buildUtilitiesPanel(root) {
             unsubscribe();
             runButton.disabled = false;
         }
+    });
+
+    // A whole new mesh (new/open/import) makes a previous run's log and
+    // before/after numbers meaningless (they describe a mesh that's gone),
+    // and a leftover "Run Quality Check" list can point at element/node ids
+    // that no longer exist - clear all three instead of leaving them to
+    // look like they still describe what's on screen.
+    bus.on("project:reset", () => {
+        quality.querySelector("#quality-results").innerHTML = "";
+        improve.querySelector("#improve-log").innerHTML = "";
+        improve.querySelector("#improve-results").innerHTML = "";
     });
 
     // ---- Display ----

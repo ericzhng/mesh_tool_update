@@ -82,6 +82,7 @@ export async function newProject() {
     setProjectName("Untitled");
     viewport.fitToPoints([]);
     setDirty(false);
+    bus.emit("project:reset");
 }
 
 export async function openProjectData(text, name) {
@@ -103,6 +104,7 @@ export async function openProjectData(text, name) {
     applyView(data.view);
     setProjectName(name);
     setDirty(false);
+    bus.emit("project:reset");
 }
 
 export async function openProject() {
@@ -169,6 +171,7 @@ export async function importMeshFile(file) {
         fileHandle = null;
         setProjectName(file.name.replace(/\.(inp|deck)$/i, ""));
         setDirty(false);
+        bus.emit("project:reset");
         toast.success(`Imported ${file.name}.`);
     } catch (err) {
         toast.error(`Failed to import mesh: ${err.message}`);

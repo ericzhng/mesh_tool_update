@@ -65,6 +65,20 @@ class QualityOverlay {
         this._changed();
     }
 
+    // Drops any computed metrics without touching `enabled`/`limits` (user
+    // preferences, not mesh-derived data) - used when a whole new mesh
+    // replaces the current one (new/open/import), so stale per-element
+    // results from the *previous* mesh can't linger in the UI. If the
+    // overlay is still enabled, the `mesh:changed` handler below recomputes
+    // fresh metrics for the new mesh right after this fires.
+    reset() {
+        this.elements = [];
+        this.summary = {};
+        this.levels = new Map();
+        this.byId = new Map();
+        this._changed();
+    }
+
     levelOf(elementId) {
         if (!this.enabled) return QualityLevel.OK;
         return this.levels.get(elementId) || QualityLevel.OK;
@@ -98,9 +112,13 @@ bus.on("mesh:changed", () => {
     if (qualityOverlay.enabled) {
         qualityOverlay.compute();
     } else if (qualityOverlay.elements.length) {
-        qualityOverlay.elements = [];
-        qualityOverlay.summary = {};
-        qualityOverlay.levels = new Map();
-        qualityOverlay.byId = new Map();
+        qualityOverlay.reset();
     }
 });
+
+// A whole new mesh (new/open/import) makes any already-computed metrics
+// meaningless, even if the overlay is enabled - there's nothing to recompute
+// from here (that happens via `mesh:changed` once the new mesh actually
+// arrives); this just makes sure stale numbers from the old mesh don't
+// linger in the meantime.
+bus.on("project:reset", () => qualityOverlay.reset());
