@@ -476,10 +476,13 @@ export function buildUtilitiesPanel(root) {
             <select id="improve-preset">
                 <option value="gentle">Gentle (smooth only)</option>
                 <option value="balanced" selected>Balanced (merge + smooth)</option>
-                <option value="aggressive">Aggressive (+ split slivers)</option>
+                <option value="aggressive">Aggressive (+ split slivers &amp; quads)</option>
             </select>
         </div>
         <div class="checkbox-row"><input type="checkbox" id="improve-lock-surfaces"><label for="improve-lock-surfaces" title="A *SURFACE reference is topological (element + face), not a position - leave this off unless a surface's exact geometry must stay fixed.">Preserve surface-set geometry</label></div>
+        <div class="field-row"><label>Max new elements</label>
+            <input type="number" id="improve-max-new" min="0" step="1" placeholder="unlimited" title="Only used by the Aggressive preset (it's the only one that adds elements). Caps total growth across the whole run; leave blank for no limit.">
+        </div>
         <div class="btn-row">
             <button class="btn btn-primary" id="improve-run">${icon("improve")}Run</button>
             <span id="improve-status" class="improve-status"></span>
@@ -539,12 +542,17 @@ export function buildUtilitiesPanel(root) {
             .filter(s => s.op === "flip_edges")
             .reduce((sum, s) => sum + (s.result.flip_count || 0), 0);
         const splitCount = result.steps
-            .filter(s => s.op === "refine_slivers")
+            .filter(s => s.op === "refine_slivers" || s.op === "refine_quads")
             .reduce((sum, s) => sum + (s.result.created_element_ids?.length || 0), 0);
+
+        const skippedCount = result.steps
+            .filter(s => s.op === "refine_slivers" || s.op === "refine_quads")
+            .reduce((sum, s) => sum + (s.result.skipped_element_ids?.length || 0), 0);
 
         const parts = [`Ran ${result.steps.length} step(s).`, `Moved ${movedCount} node(s).`];
         if (flippedCount) parts.push(`Flipped ${flippedCount} edge(s).`);
         if (splitCount) parts.push(`Split in ${splitCount} new element(s).`);
+        if (skippedCount) parts.push(`Skipped ${skippedCount} element(s) too risky to split.`);
 
         resultsEl.innerHTML = `
             <div class="empty-hint">${parts.join(" ")}</div>
@@ -577,6 +585,8 @@ export function buildUtilitiesPanel(root) {
             return;
         }
         const preset = improve.querySelector("#improve-preset").value;
+        const maxNewRaw = improve.querySelector("#improve-max-new").value;
+        const maxNewElements = maxNewRaw === "" ? null : parseInt(maxNewRaw, 10);
         const runButton = improve.querySelector("#improve-run");
         const statusEl = improve.querySelector("#improve-status");
         improve.querySelector("#improve-log").innerHTML = "";
@@ -596,7 +606,8 @@ export function buildUtilitiesPanel(root) {
         });
 
         try {
-            const result = await client.op("improve_quality", { preset, ...scopeArg });
+            const limits = maxNewElements != null ? { max_total_new_elements: maxNewElements } : undefined;
+            const result = await client.op("improve_quality", { preset, ...scopeArg, ...(limits ? { limits } : {}) });
             if (!result.ok) {
                 toast.error(result.error);
                 return;
