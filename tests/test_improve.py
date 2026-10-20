@@ -453,6 +453,30 @@ class TestRefineSlivers(unittest.TestCase):
         self.assertTrue(editor.undo())
         np.testing.assert_array_equal(editor.mesh.points, before_points)
 
+    def test_aspect_ratio_threshold_catches_slivers_skew_alone_would_miss(self):
+        # Isoceles sliver: aspect ratio ~1.99 (10 / sqrt(5**2 + 0.5**2)).
+        # `skew_threshold` is set above 1 so skewness (capped at 1.0) can
+        # never trigger it on its own - only the aspect-ratio check can.
+        points = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [5.0, 0.5, 0.0]])
+        tri = ElementBlock("CGAX3", [1], [[1, 2, 3]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3], cells=[tri])
+
+        result = refine_slivers(mesh, skew_threshold=10.0, aspect_ratio_threshold=1.9)
+
+        self.assertEqual(result["removed_element_ids"], [1])
+        self.assertEqual(len(result["created_node_ids"]), 1)
+        self.assertEqual(len(result["created_element_ids"]), 2)
+
+    def test_aspect_ratio_threshold_none_keeps_skew_only_behavior(self):
+        points = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [5.0, 0.5, 0.0]])
+        tri = ElementBlock("CGAX3", [1], [[1, 2, 3]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3], cells=[tri])
+
+        result = refine_slivers(mesh, skew_threshold=10.0)
+
+        self.assertEqual(result["removed_element_ids"], [])
+        self.assertEqual(result["created_node_ids"], [])
+
     def test_aggressive_preset_includes_refine_slivers(self):
         self.assertTrue(any(step["op"] == "refine_slivers" for step in PRESETS["aggressive"]))
         self.assertFalse(any(step["op"] == "refine_slivers" for step in PRESETS["gentle"]))

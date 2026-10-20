@@ -17,9 +17,22 @@ from .adjacency import build as build_adjacency, resolve_element_scope
 from .triangles import locked_edges, sorted_edge, triangle_topology
 
 
-def refine_slivers(mesh: Mesh | None, scope: dict | None = None, skew_threshold: float = 0.85) -> dict:
-    """Splits CGAX3 elements at/above `skew_threshold` by inserting a node
-    at the midpoint of their longest edge.
+def refine_slivers(
+    mesh: Mesh | None,
+    scope: dict | None = None,
+    skew_threshold: float = 0.85,
+    aspect_ratio_threshold: float | None = None,
+) -> dict:
+    """Splits CGAX3 elements at/above `skew_threshold` skewness, or (if
+    `aspect_ratio_threshold` is given) at/above that aspect ratio, by
+    inserting a node at the midpoint of their longest edge.
+
+    Skewness alone misses "slivers" that are merely long and thin but not
+    badly angled, and some such elements genuinely drag down mesh quality
+    without smoothing/flipping being able to fix them (the shape, not the
+    node positions or diagonal choice, is the problem) - the same
+    justification as skew-based splitting, just a different metric. A
+    triangle is a candidate if either threshold is met.
 
     If that edge is interior and shared with another triangle, both
     triangles are replaced by 4 new ones (the classic Delaunay-refinement
@@ -35,11 +48,13 @@ def refine_slivers(mesh: Mesh | None, scope: dict | None = None, skew_threshold:
     non-conforming "T-junction" against the quad, or move/orphan a named
     physical face.
 
-    Worst elements are processed first; `scope` restricts which elements
-    are considered, the same shape as `flip_edges`'s scope. New nodes/
-    elements get fresh ids (via `topology.next_point_id`/`next_element_id`)
-    and start in no sets; old element ids are dropped from `elem_sets` and
-    `surface_sets` the same way `topology.split_quads` already does.
+    Worst elements are processed first (ranked by how far each exceeds
+    whichever threshold it triggered, as a fraction of that threshold);
+    `scope` restricts which elements are considered, the same shape as
+    `flip_edges`'s scope. New nodes/elements get fresh ids (via
+    `topology.next_point_id`/`next_element_id`) and start in no sets; old
+    element ids are dropped from `elem_sets` and `surface_sets` the same
+    way `topology.split_quads` already does.
 
     Returns `{"created_node_ids": [...], "created_element_ids": [...],
     "removed_element_ids": [...], "skipped_element_ids": [...], "before":
@@ -62,16 +77,25 @@ def refine_slivers(mesh: Mesh | None, scope: dict | None = None, skew_threshold:
         p = mesh.points[id_to_index[node_id]]
         return float(p[0]), float(p[1])
 
-    def skewness_of(nodes: list[int]) -> float:
+    def shape_of(nodes: list[int]) -> dict:
         pts = np.array([point(n) for n in nodes])
-        return quality_mod.element_shape_metrics(pts, 60.0)["skewness"]
+        return quality_mod.element_shape_metrics(pts, 60.0)
+
+    def badness_of(nodes: list[int]) -> float:
+        """How far past whichever threshold it exceeds, as a fraction of
+        that threshold; 0 or below means it isn't a candidate at all."""
+        shape = shape_of(nodes)
+        score = shape["skewness"] / skew_threshold
+        if aspect_ratio_threshold is not None and shape["aspect_ratio"] is not None:
+            score = max(score, shape["aspect_ratio"] / aspect_ratio_threshold)
+        return score
 
     candidates = [
         eid
         for eid, nodes in element_to_nodes.items()
-        if (allowed_elements is None or eid in allowed_elements) and skewness_of(nodes) >= skew_threshold
+        if (allowed_elements is None or eid in allowed_elements) and badness_of(nodes) >= 1.0
     ]
-    candidates.sort(key=lambda eid: skewness_of(element_to_nodes[eid]), reverse=True)
+    candidates.sort(key=lambda eid: badness_of(element_to_nodes[eid]), reverse=True)
 
     consumed: set[int] = set()
     skipped_element_ids: list[int] = []
