@@ -248,6 +248,31 @@ class TestImproveQuality(unittest.TestCase):
         np.testing.assert_array_equal(editor.mesh.points, before_points)
         self.assertFalse(editor.can_undo())
 
+    def test_limits_max_new_elements_is_forwarded_to_refine_steps(self):
+        mesh = _structured_grid(n=5, jitter=0.4, seed=7)
+        uncapped = refine_slivers(mesh.copy(), skew_threshold=0.3)
+        result = improve_quality(
+            mesh,
+            limits={"max_new_elements": 2},
+            steps=[{"op": "refine_slivers", "skew_threshold": 0.3}],
+        )
+        self.assertEqual(result["steps"][0]["args"]["max_new_elements"], 2)
+        capped = result["steps"][0]["result"]
+        self.assertTrue(capped["skipped_element_ids"])
+        self.assertLess(len(capped["created_element_ids"]), len(uncapped["created_element_ids"]))
+
+    def test_limits_max_total_new_elements_stops_the_run_early(self):
+        mesh = _structured_grid(n=6, jitter=0.4, seed=12)
+        result = improve_quality(
+            mesh,
+            limits={"max_total_new_elements": 2},
+            steps=[{"op": "refine_slivers", "skew_threshold": 0.3}],
+            max_passes=5,
+        )
+        total_created = sum(len(s["result"]["created_element_ids"]) for s in result["steps"])
+        self.assertGreaterEqual(total_created, 2)
+        self.assertLess(len(result["steps"]), 5)
+
     def test_failing_step_rolls_back_via_editor(self):
         from planemeshforge.core.editor import MeshEditor
 
@@ -482,6 +507,26 @@ class TestRefineSlivers(unittest.TestCase):
         self.assertFalse(any(step["op"] == "refine_slivers" for step in PRESETS["gentle"]))
         self.assertFalse(any(step["op"] == "refine_slivers" for step in PRESETS["balanced"]))
 
+    def test_max_new_elements_caps_how_many_slivers_are_split(self):
+        # 3 independent boundary slivers, each worth 2 new elements once
+        # split; a cap of 2 should let exactly one through and report the
+        # other two (worst-ranked-but-unreached) as skipped.
+        points = np.array(
+            [
+                [0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.3, 1.0, 0.0],
+                [20.0, 0.0, 0.0], [30.0, 0.0, 0.0], [20.3, 1.0, 0.0],
+                [40.0, 0.0, 0.0], [50.0, 0.0, 0.0], [40.3, 1.0, 0.0],
+            ]
+        )
+        tri = ElementBlock("CGAX3", [1, 2, 3], [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3, 4, 5, 6, 7, 8, 9], cells=[tri])
+
+        result = refine_slivers(mesh, skew_threshold=0.5, max_new_elements=2)
+
+        self.assertEqual(result["removed_element_ids"], [1])
+        self.assertEqual(len(result["created_element_ids"]), 2)
+        self.assertEqual(sorted(result["skipped_element_ids"]), [2, 3])
+
 
 class TestRefineQuads(unittest.TestCase):
     # A sheared parallelogram: angles ~68.2/111.8 deg, skewness ~0.24
@@ -552,6 +597,20 @@ class TestRefineQuads(unittest.TestCase):
         self.assertEqual(mesh.elem_sets["s"], [])
         self.assertEqual(sorted(mesh.point_ids), sorted([1, 2, 3, 4] + result["created_node_ids"]))
         mesh._validate_data()
+
+    def test_max_new_elements_caps_how_many_quads_are_split(self):
+        # 3 independent skewed quads, each worth 4 new elements once split;
+        # a cap of 4 should let exactly one through and skip the other two.
+        offsets = [0.0, 20.0, 40.0]
+        points = np.vstack([self._SKEWED_QUAD_POINTS + [dx, 0.0, 0.0] for dx in offsets])
+        quads = ElementBlock("CGAX4", [1, 2, 3], [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
+        mesh = Mesh(points=points, point_ids=list(range(1, 13)), cells=[quads])
+
+        result = refine_quads(mesh, skew_threshold=0.2, max_new_elements=4)
+
+        self.assertEqual(result["removed_element_ids"], [1])
+        self.assertEqual(len(result["created_element_ids"]), 4)
+        self.assertEqual(sorted(result["skipped_element_ids"]), [2, 3])
 
     def test_op_registered_and_undoable_via_editor(self):
         from planemeshforge.core.editor import MeshEditor

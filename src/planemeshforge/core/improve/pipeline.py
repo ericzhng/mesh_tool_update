@@ -26,6 +26,9 @@ ALLOWED_STEP_OPS = {
 # `scope` argument at all.
 _SCOPED_STEP_OPS = {"smooth_nodes", "flip_edges", "refine_slivers", "refine_quads"}
 
+# Steps that can grow element count and so accept a `max_new_elements` cap.
+_REFINE_STEP_OPS = {"refine_slivers", "refine_quads"}
+
 
 def improve_quality(
     mesh: Mesh | None,
@@ -48,6 +51,17 @@ def improve_quality(
     `max_passes` reruns the full step list until the worst skewness stops
     improving or drops to/below `limits["skewness"]` (if given) - most
     presets converge in 1-2 passes.
+
+    `limits["max_new_elements"]`, if given, is passed as a default to any
+    `refine_slivers`/`refine_quads` step that doesn't set its own (capping
+    how many new elements *that one step* may create).
+    `limits["max_total_new_elements"]`, if given, instead caps how many new
+    elements the *whole recipe run* may create across every step and pass
+    combined - once reached, the run stops after the step that hit it,
+    same as any other stop condition. Both exist because `max_passes`
+    alone doesn't bound growth: each pass of an aggressive recipe can add
+    geometry, and a pathological mesh (or a generous `max_passes`) could
+    otherwise refine without bound.
 
     `progress`, if given, is called after each completed step with
     `{"step": i, "total_steps": n, "op": op_name, "pass": pass_index,
@@ -74,6 +88,9 @@ def improve_quality(
     previous_worst_skew: float | None = None
     total_steps = len(step_list) * max(1, max_passes)
     step_number = 0
+    total_new_elements = 0
+    max_total_new_elements = (limits or {}).get("max_total_new_elements")
+    capped_out = False
 
     for pass_index in range(max(1, max_passes)):
         for raw_step in step_list:
@@ -86,6 +103,8 @@ def improve_quality(
                 step_args["scope"] = {**(scope or {}), **step_args.get("scope", {})}
                 if limits:
                     step_args["scope"].setdefault("limits", limits)
+            if op_name in _REFINE_STEP_OPS and limits and "max_new_elements" in limits:
+                step_args.setdefault("max_new_elements", limits["max_new_elements"])
 
             before_step = quality_mod.metrics(mesh)["summary"]
             result = ops_module.OPS[op_name](mesh, **step_args)
@@ -93,6 +112,7 @@ def improve_quality(
             step_reports.append(
                 {"op": op_name, "args": step_args, "result": result, "before": before_step, "after": after_step}
             )
+            total_new_elements += len(result.get("created_element_ids") or [])
 
             step_number += 1
             if progress is not None:
@@ -105,6 +125,13 @@ def improve_quality(
                         "after": after_step,
                     }
                 )
+
+            if max_total_new_elements is not None and total_new_elements >= max_total_new_elements:
+                capped_out = True
+                break
+
+        if capped_out:
+            break
 
         worst_skew = step_reports[-1]["after"].get("skewness", {}).get("max")
         if worst_skew is None:

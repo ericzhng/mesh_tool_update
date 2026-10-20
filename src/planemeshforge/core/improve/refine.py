@@ -22,10 +22,19 @@ def refine_slivers(
     scope: dict | None = None,
     skew_threshold: float = 0.85,
     aspect_ratio_threshold: float | None = None,
+    max_new_elements: int | None = None,
 ) -> dict:
     """Splits CGAX3 elements at/above `skew_threshold` skewness, or (if
     `aspect_ratio_threshold` is given) at/above that aspect ratio, by
     inserting a node at the midpoint of their longest edge.
+
+    `max_new_elements`, if given, caps how many new elements this one call
+    may create - once reached, every remaining (not yet processed)
+    candidate is left alone and reported in `skipped_element_ids`, worst
+    first, same as any other skip. Without it, a mesh with many bad
+    elements refines all of them in one call, which for a pathological
+    mesh (or a multi-pass `improve_quality` recipe repeating this step) can
+    grow element count without bound.
 
     Skewness alone misses "slivers" that are merely long and thin but not
     badly angled, and some such elements genuinely drag down mesh quality
@@ -108,9 +117,12 @@ def refine_slivers(
     next_point_id = topo.next_point_id(mesh)
     next_element_id = topo.next_element_id(mesh)
 
-    for eid in candidates:
+    for idx, eid in enumerate(candidates):
         if eid in consumed:
             continue
+        if max_new_elements is not None and len(created_element_ids) >= max_new_elements:
+            skipped_element_ids.extend(c for c in candidates[idx:] if c not in consumed)
+            break
         nodes = element_to_nodes[eid]
         a, b = _longest_edge(nodes, point)
         edge = sorted_edge(a, b)
@@ -198,10 +210,17 @@ def refine_quads(
     scope: dict | None = None,
     skew_threshold: float = 0.85,
     aspect_ratio_threshold: float | None = None,
+    max_new_elements: int | None = None,
 ) -> dict:
     """Splits CGAX4 elements at/above `skew_threshold` skewness, or (if
     `aspect_ratio_threshold` is given) at/above that aspect ratio, into 4
     child quads around a new centroid node and 4 new edge-midpoint nodes.
+
+    `max_new_elements`, if given, caps how many new elements this one call
+    may create - once reached, every remaining (not yet processed)
+    candidate is left alone and reported in `skipped_element_ids`, worst
+    first, same as any other skip. See `refine_slivers` for why this cap
+    exists.
 
     Unlike `refine_slivers`, this only ever touches a quad whose all 4
     edges are true mesh-boundary edges (`_full_2d_edge_degree` of 1) and
@@ -280,7 +299,10 @@ def refine_quads(
         bx, by, bz = point(b)
         return [(ax + bx) / 2.0, (ay + by) / 2.0, (az + bz) / 2.0]
 
-    for eid in candidates:
+    for idx, eid in enumerate(candidates):
+        if max_new_elements is not None and len(created_element_ids) >= max_new_elements:
+            skipped_element_ids.extend(candidates[idx:])
+            break
         nodes = element_to_nodes[eid]
         n = len(nodes)
         edges = [sorted_edge(nodes[i], nodes[(i + 1) % n]) for i in range(n)]
