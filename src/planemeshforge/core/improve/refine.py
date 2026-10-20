@@ -193,6 +193,159 @@ def refine_slivers(
     }
 
 
+def refine_quads(
+    mesh: Mesh | None,
+    scope: dict | None = None,
+    skew_threshold: float = 0.85,
+    aspect_ratio_threshold: float | None = None,
+) -> dict:
+    """Splits CGAX4 elements at/above `skew_threshold` skewness, or (if
+    `aspect_ratio_threshold` is given) at/above that aspect ratio, into 4
+    child quads around a new centroid node and 4 new edge-midpoint nodes.
+
+    Unlike `refine_slivers`, this only ever touches a quad whose all 4
+    edges are true mesh-boundary edges (`_full_2d_edge_degree` of 1) and
+    unlocked: splitting an *interior* edge would need the neighbor across
+    it to split in lock-step too (to avoid a non-conforming T-junction),
+    and that neighbor's own other edges could in turn need the same from
+    *its* neighbors - an unbounded propagation this function deliberately
+    doesn't attempt. A quad with any interior or locked edge is left alone
+    and reported in `skipped_element_ids`; this makes the op safe to call
+    everywhere, just conservative about which quads it can actually fix.
+
+    Worst elements are processed first (ranked by how far each exceeds
+    whichever threshold it triggered, as a fraction of that threshold);
+    `scope` restricts which elements are considered, the same shape as
+    `refine_slivers`'s scope. New nodes/elements get fresh ids and start in
+    no sets; old element ids are dropped from `elem_sets` and
+    `surface_sets` the same way `refine_slivers` already does.
+
+    Returns `{"created_node_ids": [...], "created_element_ids": [...],
+    "removed_element_ids": [...], "skipped_element_ids": [...], "before":
+    summary, "after": summary}`.
+    """
+    if mesh is None:
+        raise ValueError("No mesh is loaded.")
+
+    before_summary = quality_mod.metrics(mesh)["summary"]
+    id_to_index = {pid: i for i, pid in enumerate(mesh.point_ids)}
+
+    element_to_nodes: dict[int, list[int]] = {}
+    for block in mesh.cells:
+        if block.element_type != "CGAX4":
+            continue
+        for eid, conn in zip(block.ids, block.connectivity):
+            element_to_nodes[int(eid)] = [int(n) for n in conn]
+
+    locked = locked_edges(mesh, element_to_nodes)
+    full_edge_degree = _full_2d_edge_degree(mesh)
+
+    adjacency = build_adjacency(mesh)
+    allowed_elements = resolve_element_scope(mesh, adjacency, scope)
+
+    def point(node_id: int) -> tuple[float, float, float]:
+        p = mesh.points[id_to_index[node_id]]
+        return float(p[0]), float(p[1]), float(p[2])
+
+    def shape_of(nodes: list[int]) -> dict:
+        pts = np.array([point(n)[:2] for n in nodes])
+        return quality_mod.element_shape_metrics(pts, 90.0)
+
+    def badness_of(nodes: list[int]) -> float:
+        shape = shape_of(nodes)
+        score = shape["skewness"] / skew_threshold
+        if aspect_ratio_threshold is not None and shape["aspect_ratio"] is not None:
+            score = max(score, shape["aspect_ratio"] / aspect_ratio_threshold)
+        return score
+
+    candidates = [
+        eid
+        for eid, nodes in element_to_nodes.items()
+        if (allowed_elements is None or eid in allowed_elements) and badness_of(nodes) >= 1.0
+    ]
+    candidates.sort(key=lambda eid: badness_of(element_to_nodes[eid]), reverse=True)
+
+    skipped_element_ids: list[int] = []
+    removed_element_ids: list[int] = []
+    created_node_ids: list[int] = []
+    new_points: list[list[float]] = []
+    created_element_ids: list[int] = []
+    new_conn: list[list[int]] = []
+
+    next_point_id = topo.next_point_id(mesh)
+    next_element_id = topo.next_element_id(mesh)
+
+    def midpoint(a: int, b: int) -> list[float]:
+        ax, ay, az = point(a)
+        bx, by, bz = point(b)
+        return [(ax + bx) / 2.0, (ay + by) / 2.0, (az + bz) / 2.0]
+
+    for eid in candidates:
+        nodes = element_to_nodes[eid]
+        n = len(nodes)
+        edges = [sorted_edge(nodes[i], nodes[(i + 1) % n]) for i in range(n)]
+        if any(e in locked or full_edge_degree.get(e, 1) != 1 for e in edges):
+            skipped_element_ids.append(eid)
+            continue
+
+        mids: list[int] = []
+        for a, b in zip(nodes, nodes[1:] + nodes[:1]):
+            m = next_point_id
+            next_point_id += 1
+            created_node_ids.append(m)
+            new_points.append(midpoint(a, b))
+            mids.append(m)
+
+        cx, cy, cz = (sum(point(v)[i] for v in nodes) / n for i in range(3))
+        centroid = next_point_id
+        next_point_id += 1
+        created_node_ids.append(centroid)
+        new_points.append([cx, cy, cz])
+
+        n0, n1, n2, n3 = nodes
+        m01, m12, m23, m30 = mids
+        for child in ([n0, m01, centroid, m30], [n1, m12, centroid, m01], [n2, m23, centroid, m12], [n3, m30, centroid, m23]):
+            new_conn.append(child)
+            created_element_ids.append(next_element_id)
+            next_element_id += 1
+
+        removed_element_ids.append(eid)
+
+    if new_points:
+        mesh.points = np.vstack([mesh.points, new_points])
+        mesh.point_ids.extend(created_node_ids)
+
+    if removed_element_ids:
+        removed_set = set(removed_element_ids)
+        remaining_blocks = []
+        for block in mesh.cells:
+            if block.element_type != "CGAX4":
+                remaining_blocks.append(block)
+                continue
+            keep_mask = np.array([int(eid) not in removed_set for eid in block.ids])
+            if keep_mask.any():
+                remaining_blocks.append(ElementBlock("CGAX4", block.ids[keep_mask], block.connectivity[keep_mask]))
+        mesh.cells = remaining_blocks
+        if new_conn:
+            new_block = ElementBlock("CGAX4", np.array(created_element_ids), np.array(new_conn))
+            mesh.cells = topo.merge_element_blocks(mesh.cells + [new_block])
+
+        for name in list(mesh.elem_sets):
+            mesh.elem_sets[name] = [i for i in mesh.elem_sets[name] if i not in removed_set]
+        topo.remap_surface_sets(mesh, removed_element_ids=removed_element_ids)
+        mesh._validate_data()
+
+    after_summary = quality_mod.metrics(mesh)["summary"]
+    return {
+        "created_node_ids": created_node_ids,
+        "created_element_ids": created_element_ids,
+        "removed_element_ids": removed_element_ids,
+        "skipped_element_ids": skipped_element_ids,
+        "before": before_summary,
+        "after": after_summary,
+    }
+
+
 def _full_2d_edge_degree(mesh: Mesh) -> dict[tuple[int, int], int]:
     """Edge -> number of 2D elements (triangles *and* quads) touching it.
 

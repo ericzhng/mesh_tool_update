@@ -8,7 +8,7 @@ from planemeshforge.core.improve import adjacency
 from planemeshforge.core.improve.flipping import flip_edges
 from planemeshforge.core.improve.pipeline import improve_quality
 from planemeshforge.core.improve.presets import PRESETS
-from planemeshforge.core.improve.refine import refine_slivers
+from planemeshforge.core.improve.refine import refine_quads, refine_slivers
 from planemeshforge.core.improve.smoothing import smooth_nodes
 
 
@@ -481,6 +481,97 @@ class TestRefineSlivers(unittest.TestCase):
         self.assertTrue(any(step["op"] == "refine_slivers" for step in PRESETS["aggressive"]))
         self.assertFalse(any(step["op"] == "refine_slivers" for step in PRESETS["gentle"]))
         self.assertFalse(any(step["op"] == "refine_slivers" for step in PRESETS["balanced"]))
+
+
+class TestRefineQuads(unittest.TestCase):
+    # A sheared parallelogram: angles ~68.2/111.8 deg, skewness ~0.24
+    # against the 90 deg ideal - skewed enough to be a candidate at
+    # skew_threshold=0.2, but still a valid convex quad.
+    _SKEWED_QUAD_POINTS = np.array(
+        [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [12.0, 5.0, 0.0], [2.0, 5.0, 0.0]]
+    )
+
+    def test_rejects_missing_mesh(self):
+        with self.assertRaises(ValueError):
+            refine_quads(None)
+
+    def test_splits_an_isolated_skewed_quad_into_four(self):
+        quad = ElementBlock("CGAX4", [1], [[1, 2, 3, 4]])
+        mesh = Mesh(points=self._SKEWED_QUAD_POINTS, point_ids=[1, 2, 3, 4], cells=[quad])
+        before_elements = quality.metrics(mesh)["elements"]
+
+        result = refine_quads(mesh, skew_threshold=0.2)
+
+        self.assertEqual(result["removed_element_ids"], [1])
+        self.assertEqual(result["skipped_element_ids"], [])
+        self.assertEqual(len(result["created_node_ids"]), 5)  # 4 midpoints + 1 centroid
+        self.assertEqual(len(result["created_element_ids"]), 4)
+        self.assertEqual(sum(len(b.ids) for b in mesh.cells), 4)
+        after_elements = quality.metrics(mesh)["elements"]
+        self.assertLessEqual(max(e["skewness"] for e in after_elements), before_elements[0]["skewness"])
+        for issue in quality.check(mesh):
+            self.assertNotIn(issue["kind"], ("inverted_element", "degenerate_element"))
+
+    def test_skips_a_quad_with_an_interior_edge(self):
+        # quad 1's (1, 2) edge is shared with quad 2 (a plain, unskewed
+        # rectangle) - splitting quad 1 would need quad 2 to split in
+        # lock-step too, which this op deliberately never attempts, so
+        # quad 1 must be left alone even though it's badly skewed.
+        points = np.vstack([self._SKEWED_QUAD_POINTS, [[0.0, -5.0, 0.0], [10.0, -5.0, 0.0]]])
+        quad1 = ElementBlock("CGAX4", [1, 2], [[1, 2, 3, 4], [2, 1, 5, 6]])
+        mesh = Mesh(points=points, point_ids=[1, 2, 3, 4, 5, 6], cells=[quad1])
+
+        result = refine_quads(mesh, skew_threshold=0.2)
+
+        self.assertEqual(result["skipped_element_ids"], [1])
+        self.assertEqual(result["removed_element_ids"], [])
+        self.assertEqual(sum(len(b.ids) for b in mesh.cells), 2)
+
+    def test_skips_a_quad_whose_edge_is_a_locked_surface_face(self):
+        quad = ElementBlock("CGAX4", [1], [[1, 2, 3, 4]])
+        mesh = Mesh(
+            points=self._SKEWED_QUAD_POINTS,
+            point_ids=[1, 2, 3, 4],
+            cells=[quad],
+            surface_sets={"pinned": ["1", "S1"]},
+        )
+
+        result = refine_quads(mesh, skew_threshold=0.2)
+
+        self.assertEqual(result["skipped_element_ids"], [1])
+        self.assertEqual(result["removed_element_ids"], [])
+
+    def test_preserves_elem_sets_and_remaps_surface_sets(self):
+        quad = ElementBlock("CGAX4", [1], [[1, 2, 3, 4]])
+        mesh = Mesh(
+            points=self._SKEWED_QUAD_POINTS, point_ids=[1, 2, 3, 4], cells=[quad], elem_sets={"s": [1]}
+        )
+
+        result = refine_quads(mesh, skew_threshold=0.2)
+
+        self.assertEqual(mesh.elem_sets["s"], [])
+        self.assertEqual(sorted(mesh.point_ids), sorted([1, 2, 3, 4] + result["created_node_ids"]))
+        mesh._validate_data()
+
+    def test_op_registered_and_undoable_via_editor(self):
+        from planemeshforge.core.editor import MeshEditor
+
+        quad = ElementBlock("CGAX4", [1], [[1, 2, 3, 4]])
+        mesh = Mesh(points=self._SKEWED_QUAD_POINTS, point_ids=[1, 2, 3, 4], cells=[quad])
+        editor = MeshEditor(mesh)
+        before_points = mesh.points.copy()
+
+        response = editor.apply("refine_quads", {"skew_threshold": 0.2})
+        self.assertTrue(response["ok"])
+        self.assertEqual(len(response["created_node_ids"]), 5)
+
+        self.assertTrue(editor.undo())
+        np.testing.assert_array_equal(editor.mesh.points, before_points)
+
+    def test_aggressive_preset_includes_refine_quads(self):
+        self.assertTrue(any(step["op"] == "refine_quads" for step in PRESETS["aggressive"]))
+        self.assertFalse(any(step["op"] == "refine_quads" for step in PRESETS["gentle"]))
+        self.assertFalse(any(step["op"] == "refine_quads" for step in PRESETS["balanced"]))
 
 
 if __name__ == "__main__":

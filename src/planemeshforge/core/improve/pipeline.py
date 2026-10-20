@@ -9,15 +9,22 @@ from .. import ops as ops_module
 from .presets import PRESETS
 
 # Only step ops that are safe to run unattended as part of a recipe: they
-# don't delete geometry a user didn't ask to delete (refine_slivers is the
-# one exception - it adds geometry, which is exactly what it's for), and
-# they're idempotent enough to repeat across passes.
-ALLOWED_STEP_OPS = {"merge_nodes", "fix_orientation", "smooth_nodes", "flip_edges", "refine_slivers"}
+# don't delete geometry a user didn't ask to delete (refine_slivers and
+# refine_quads are the exceptions - they add geometry, which is exactly
+# what they're for), and they're idempotent enough to repeat across passes.
+ALLOWED_STEP_OPS = {
+    "merge_nodes",
+    "fix_orientation",
+    "smooth_nodes",
+    "flip_edges",
+    "refine_slivers",
+    "refine_quads",
+}
 
 # Steps whose own `scope` dict should inherit the recipe-level scope/limits
 # (a step's own `scope` wins on conflicting keys) - every step that takes a
 # `scope` argument at all.
-_SCOPED_STEP_OPS = {"smooth_nodes", "flip_edges", "refine_slivers"}
+_SCOPED_STEP_OPS = {"smooth_nodes", "flip_edges", "refine_slivers", "refine_quads"}
 
 
 def improve_quality(
